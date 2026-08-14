@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ saveAppearance: vi.fn(), savePlans: vi.fn(), values: vi.fn().mockResolvedValue(undefined) }));
+const mocks = vi.hoisted(() => ({ saveAppearance: vi.fn(), savePlans: vi.fn(), getPlans: vi.fn().mockResolvedValue([{ planName: "go", billingTerm: "monthly", label: "Go تجريبي", priceEgp: 55, novelLimit: 11, audioChapterLimitPerNovel: 2, enabled: true }]), values: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("../db", () => ({ getDb: vi.fn().mockResolvedValue({ insert: vi.fn().mockReturnValue({ values: mocks.values }) }) }));
 vi.mock("../lib/platformSettings", async importOriginal => {
   const actual = await importOriginal<typeof import("../lib/platformSettings")>();
-  return { ...actual, saveAppearanceSettings: mocks.saveAppearance, saveManagedPlans: mocks.savePlans };
+  return { ...actual, getManagedPlans: mocks.getPlans, saveAppearanceSettings: mocks.saveAppearance, saveManagedPlans: mocks.savePlans };
 });
 
 import { platformSettingsRouter } from "./platformSettings";
@@ -14,8 +14,8 @@ const appearance = { platformName: "روايتي", tagline: "عبارة", heroEy
 const plans = [{ planName: "go" as const, billingTerm: "monthly" as const, label: "Go تجريبي", priceEgp: 55, novelLimit: 11, audioChapterLimitPerNovel: 2, enabled: true }];
 
 describe("إجراءات حفظ إعدادات المنصة", () => {
-  it("يحفظ المظهر والباقات عند طلب مدير مرخص", async () => {
-    const caller = platformSettingsRouter.createCaller({ user: { id: 27, role: "admin" } } as never);
+  it("يحفظ المظهر والباقات عند طلب مدير نظام مرخص", async () => {
+    const caller = platformSettingsRouter.createCaller({ user: { id: 27, role: "super_admin" } } as never);
     await caller.admin.saveAppearance(appearance);
     await caller.admin.savePlans({ plans });
     expect(mocks.saveAppearance).toHaveBeenCalledWith(appearance, 27);

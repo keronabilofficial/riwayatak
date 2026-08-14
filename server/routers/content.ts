@@ -26,7 +26,7 @@ import { mapChapterOrder } from "../lib/chapters";
 import { reviewInputSchema } from "../lib/reviews";
 import { getReaderAccess } from "../lib/subscriptionAccess";
 import { notifyOwner } from "../_core/notification";
-import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
 const publicationStatus = z.enum(["draft", "review", "published", "unpublished", "archived"]);
 const paginationInput = z.object({ limit: z.number().int().min(1).max(48).optional(), offset: z.number().int().min(0).optional() });
@@ -166,11 +166,11 @@ export const adminRouter = router({
     ]);
     return { novels: novelCount[0]?.value ?? 0, authors: authorCount[0]?.value ?? 0, chapters: chapterCount[0]?.value ?? 0, readings: readingCount[0]?.value ?? 0, users: userCount[0]?.value ?? 0, recentActivity };
   }),
-  listUsers: adminProcedure.input(paginationInput).query(async ({ input }) => {
+  listUsers: superAdminProcedure.input(paginationInput).query(async ({ input }) => {
     const db = await requireDb();
     return db.select({ id: users.id, name: users.name, email: users.email, role: users.role, isDisabled: users.isDisabled, lastSignedIn: users.lastSignedIn, createdAt: users.createdAt }).from(users).orderBy(desc(users.lastSignedIn)).limit(input.limit ?? 48).offset(input.offset ?? 0);
   }),
-  updateUserAccess: adminProcedure.input(z.object({ id: z.number().int(), role: z.enum(["user", "editor", "admin", "super_admin"]), isDisabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+  updateUserAccess: superAdminProcedure.input(z.object({ id: z.number().int(), role: z.enum(["user", "editor", "admin", "super_admin"]), isDisabled: z.boolean() })).mutation(async ({ ctx, input }) => {
     const accessError = getUserAccessUpdateError({ actorId: ctx.user.id, actorRole: ctx.user.role, targetId: input.id, nextRole: input.role, isDisabled: input.isDisabled });
     if (accessError) throw new TRPCError(accessError);
     const db = await requireDb();

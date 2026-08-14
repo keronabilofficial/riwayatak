@@ -60,3 +60,13 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+export const superAdminProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    if (!ctx.user || ctx.user.role !== "super_admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "هذه العملية متاحة لمدير النظام فقط." });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);

@@ -24,7 +24,8 @@ import AdminAds from "./pages/admin/AdminAds";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminTaxonomy from "./pages/admin/AdminTaxonomy";
 import AdminUsers from "./pages/admin/AdminUsers";
-import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings";
+import AdminPlansSettings from "./pages/admin/AdminPlansSettings";
+import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -45,11 +46,12 @@ function Router() {
       <Route path={"/admin/authors"} component={AdminAuthors} />
       <Route path={"/admin/novels"} component={AdminNovels} />
       <Route path={"/admin/taxonomy"} component={AdminTaxonomy} />
-      <Route path={"/admin/users"} component={AdminUsers} />
+      <Route path={"/admin/system/users"} component={AdminUsers} />
       <Route path={"/admin/operations"} component={AdminOperations} />
-      <Route path={"/admin/platform"} component={AdminPlatformSettings} />
+      <Route path={"/admin/system/plans"} component={AdminPlansSettings} />
+      <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
       <Route path={"/admin/media"} component={AdminMedia} />
-      <Route path={"/admin/ads"} component={AdminAds} />
+      <Route path={"/admin/system/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
       <Route path={"/404"} component={NotFound} />

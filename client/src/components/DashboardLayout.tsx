@@ -21,22 +21,24 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, Image, LayoutDashboard, LogOut, Megaphone, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
+import { BookOpen, Image, LayoutDashboard, LogOut, Megaphone, Palette, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "نظرة عامة", path: "/admin" },
-  { icon: Users, label: "المؤلفون", path: "/admin/authors" },
-  { icon: BookOpen, label: "الروايات والفصول", path: "/admin/novels" },
-  { icon: Tags, label: "التصنيفات والوسوم", path: "/admin/taxonomy" },
-  { icon: Image, label: "الوسائط", path: "/admin/media" },
-  { icon: Megaphone, label: "الإعلانات", path: "/admin/ads" },
-  { icon: ShieldCheck, label: "المستخدمون", path: "/admin/users" },
-  { icon: Workflow, label: "التشغيل", path: "/admin/operations" },
-  { icon: Settings2, label: "المنصة والباقات", path: "/admin/platform" },
+type ManagementRole = "editor" | "admin" | "super_admin";
+const menuItems: { icon: typeof LayoutDashboard; label: string; path: string; roles: ManagementRole[] }[] = [
+  { icon: LayoutDashboard, label: "نظرة عامة", path: "/admin", roles: ["admin", "super_admin"] },
+  { icon: Users, label: "المؤلفون", path: "/admin/authors", roles: ["editor", "admin", "super_admin"] },
+  { icon: BookOpen, label: "الروايات والفصول", path: "/admin/novels", roles: ["editor", "admin", "super_admin"] },
+  { icon: Tags, label: "التصنيفات والوسوم", path: "/admin/taxonomy", roles: ["editor", "admin", "super_admin"] },
+  { icon: Image, label: "الوسائط", path: "/admin/media", roles: ["editor", "admin", "super_admin"] },
+  { icon: Workflow, label: "التشغيل", path: "/admin/operations", roles: ["admin", "super_admin"] },
+  { icon: Settings2, label: "الباقات", path: "/admin/system/plans", roles: ["super_admin"] },
+  { icon: Palette, label: "المظهر", path: "/admin/system/appearance", roles: ["super_admin"] },
+  { icon: Megaphone, label: "إعلانات Google", path: "/admin/system/ads", roles: ["super_admin"] },
+  { icon: ShieldCheck, label: "المستخدمون والأدوار", path: "/admin/system/users", roles: ["super_admin"] },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -113,7 +115,8 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const visibleMenuItems = menuItems.filter(item => item.roles.includes(user?.role as ManagementRole));
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -180,7 +183,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
+              {visibleMenuItems.map(item => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>

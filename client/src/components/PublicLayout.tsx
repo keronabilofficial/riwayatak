@@ -42,7 +42,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate("/search")} aria-label="البحث"><Search className="h-5 w-5" /></Button>
             <ThemeToggle />
             {isAuthenticated ? (
-              <Button variant="outline" className="border-border bg-transparent" onClick={() => navigate(user?.role !== "user" ? "/admin" : "/library")}>مكتبتي</Button>
+              <Button variant="outline" className="border-border bg-transparent" onClick={() => navigate("/library")}>مكتبتي</Button>
             ) : (
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => startLogin()}>دخول</Button>
             )}

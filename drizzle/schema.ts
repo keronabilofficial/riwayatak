@@ -288,6 +288,7 @@ export const adSlots = mysqlTable("ad_slots", {
   placement: mysqlEnum("placement", ["home", "category", "novel", "reader"]).notNull(),
   label: varchar("label", { length: 120 }).notNull(),
   provider: varchar("provider", { length: 80 }),
+  adSensePublisherId: varchar("adSensePublisherId", { length: 32 }),
   slotCode: varchar("slotCode", { length: 255 }),
   isEnabled: boolean("isEnabled").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
