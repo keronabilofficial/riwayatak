@@ -3,6 +3,7 @@ import {
   authors,
   categories,
   chapters,
+  chapterAudio,
   media,
   novelCategories,
   novels,
@@ -126,8 +127,8 @@ export async function getPublicNovel(slug: string) {
   return { ...novel, chapters: chapterRows, categories: categoryRows, tags: tagRows, related: relatedRows.filter(item => item.id !== novel.id) };
 }
 
-export async function getPublicChapter(novelSlug: string, chapterSlug: string) {
-  const db = await getDb();
+export async function getPublicChapter(novelSlug: string, chapterSlug: string, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const db = dbOverride ?? await getDb();
   if (!db) return null;
   const rows = await db
     .select({
@@ -141,10 +142,13 @@ export async function getPublicChapter(novelSlug: string, chapterSlug: string) {
       novelSlug: novels.slug,
       authorName: authors.displayName,
       authorSlug: authors.slug,
+      audioUrl: chapterAudio.url,
+      audioDurationSeconds: chapterAudio.durationSeconds,
     })
     .from(chapters)
     .innerJoin(novels, eq(chapters.novelId, novels.id))
     .innerJoin(authors, eq(novels.authorId, authors.id))
+    .leftJoin(chapterAudio, eq(chapterAudio.chapterId, chapters.id))
     .where(
       and(
         eq(novels.slug, novelSlug),

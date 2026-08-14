@@ -46,9 +46,30 @@
     --input: rgba(29, 41, 64, 0.18);
     --ring: #af7c42;
   }
+  .dark {
+    --background: #101722;
+    --foreground: #edf0f5;
+    --card: #172133;
+    --card-foreground: #edf0f5;
+    --popover: #172133;
+    --popover-foreground: #edf0f5;
+    --primary: #ead7ad;
+    --primary-foreground: #101722;
+    --secondary: #202d43;
+    --secondary-foreground: #edf0f5;
+    --muted: #202d43;
+    --muted-foreground: #bac5d5;
+    --accent: #283650;
+    --accent-foreground: #edf0f5;
+    --destructive: #ef736c;
+    --destructive-foreground: #101722;
+    --border: rgba(237, 240, 245, 0.16);
+    --input: rgba(237, 240, 245, 0.20);
+    --ring: #d5a85e;
+  }
   * { @apply border-border; }
   html { direction: rtl; scroll-behavior: smooth; }
-  body { @apply m-0 bg-[#f6f1e7] font-sans text-[#1d2940] antialiased; }
+  body { @apply m-0 bg-background font-sans text-foreground antialiased; }
   button, input, textarea, select { font: inherit; }
   ::selection { background: #d5a85e; color: #1d2940; }
 }
@@ -67,3 +88,11 @@
   a, button { transition: color 160ms cubic-bezier(.23,1,.32,1), background-color 160ms cubic-bezier(.23,1,.32,1), border-color 160ms cubic-bezier(.23,1,.32,1), transform 160ms cubic-bezier(.23,1,.32,1), box-shadow 160ms cubic-bezier(.23,1,.32,1); }
   button:active { transform: scale(.97); }
 }
+
+/* ألوان متوافقة مع المكونات الحالية التي تستخدم درجات العلامة صراحةً. */
+.dark .bg-\[\#f6f1e7\], .dark .bg-\[\#fbf8f2\], .dark .bg-white { background-color: #172133 !important; }
+.dark .bg-\[\#e9dfca\]\/45, .dark .bg-\[\#e9dfca\]\/35, .dark .bg-\[\#e9dfca\] { background-color: #202d43 !important; }
+.dark .text-\[\#1d2940\], .dark .text-\[\#435063\] { color: #edf0f5 !important; }
+.dark .text-\[\#526071\], .dark .text-\[\#667085\] { color: #bac5d5 !important; }
+.dark .border-\[\#1d2940\]\/10, .dark .border-\[\#1d2940\]\/20 { border-color: rgba(237, 240, 245, .16) !important; }
+.dark .hover\:bg-\[\#e9dfca\]:hover { background-color: #283650 !important; }

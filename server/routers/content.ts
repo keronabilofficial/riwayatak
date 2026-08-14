@@ -9,6 +9,7 @@ import {
   favorites,
   novelCategories,
   novelFollows,
+  novelReviews,
   novelTags,
   novels,
   notifications,
@@ -22,6 +23,7 @@ import { getHomeContent, getPublicAuthor, getPublicChapter, getPublicNovel, list
 import { normalizeArabic, toSlug } from "../lib/arabic";
 import { getUserAccessUpdateError } from "../lib/access";
 import { mapChapterOrder } from "../lib/chapters";
+import { reviewInputSchema } from "../lib/reviews";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
@@ -108,6 +110,37 @@ export const libraryRouter = router({
   markNotificationRead: protectedProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, input.id), eq(notifications.userId, ctx.user.id)));
+    return { success: true };
+  }),
+});
+
+export const reviewsRouter = router({
+  summary: publicProcedure.input(z.object({ novelId: z.number().int() })).query(async ({ input }) => {
+    const db = await requireDb();
+    const [summary] = await db.select({ average: sql<string | null>`AVG(${novelReviews.rating})`, count: count(novelReviews.id) }).from(novelReviews).where(eq(novelReviews.novelId, input.novelId));
+    return { average: summary?.average ? Number(summary.average) : null, count: Number(summary?.count ?? 0) };
+  }),
+  list: publicProcedure.input(z.object({ novelId: z.number().int(), limit: z.number().int().min(1).max(30).default(12) })).query(async ({ input }) => {
+    const db = await requireDb();
+    return db.select({ id: novelReviews.id, rating: novelReviews.rating, body: novelReviews.body, createdAt: novelReviews.createdAt, updatedAt: novelReviews.updatedAt, userName: users.name }).from(novelReviews).innerJoin(users, eq(novelReviews.userId, users.id)).where(eq(novelReviews.novelId, input.novelId)).orderBy(desc(novelReviews.updatedAt)).limit(input.limit);
+  }),
+  mine: protectedProcedure.input(z.object({ novelId: z.number().int() })).query(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [review] = await db.select({ id: novelReviews.id, rating: novelReviews.rating, body: novelReviews.body, updatedAt: novelReviews.updatedAt }).from(novelReviews).where(and(eq(novelReviews.novelId, input.novelId), eq(novelReviews.userId, ctx.user.id))).limit(1);
+    return review ?? null;
+  }),
+  upsert: protectedProcedure.input(reviewInputSchema).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [novel] = await db.select({ id: novels.id, status: novels.status }).from(novels).where(eq(novels.id, input.novelId)).limit(1);
+    if (!novel || novel.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "لا يمكن تقييم رواية غير منشورة." });
+    await db.insert(novelReviews).values({ novelId: input.novelId, userId: ctx.user.id, rating: input.rating, body: input.body }).onDuplicateKeyUpdate({ set: { rating: input.rating, body: input.body, updatedAt: new Date() } });
+    await logActivity(ctx.user.id, "review.upserted", "novel", input.novelId, { rating: input.rating });
+    return { success: true };
+  }),
+  remove: protectedProcedure.input(z.object({ novelId: z.number().int() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.delete(novelReviews).where(and(eq(novelReviews.novelId, input.novelId), eq(novelReviews.userId, ctx.user.id)));
+    await logActivity(ctx.user.id, "review.deleted", "novel", input.novelId);
     return { success: true };
   }),
 });

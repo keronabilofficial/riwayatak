@@ -120,6 +120,24 @@ export const novels = mysqlTable(
   ]
 );
 
+export const novelReviews = mysqlTable(
+  "novel_reviews",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    rating: int("rating").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("novel_reviews_user_novel_unique").on(table.userId, table.novelId),
+    index("novel_reviews_novel_updated_idx").on(table.novelId, table.updatedAt),
+    index("novel_reviews_novel_rating_idx").on(table.novelId, table.rating),
+  ]
+);
+
 export const chapters = mysqlTable(
   "chapters",
   {
@@ -142,6 +160,23 @@ export const chapters = mysqlTable(
     uniqueIndex("chapters_novel_order_unique").on(table.novelId, table.sortOrder),
     index("chapters_reading_idx").on(table.novelId, table.status, table.sortOrder),
   ]
+);
+
+export const chapterAudio = mysqlTable(
+  "chapter_audio",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    chapterId: int("chapterId").notNull().references(() => chapters.id, { onDelete: "cascade" }).unique(),
+    storageKey: varchar("storageKey", { length: 512 }).notNull().unique(),
+    url: varchar("url", { length: 1024 }).notNull(),
+    mimeType: varchar("mimeType", { length: 127 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    durationSeconds: int("durationSeconds"),
+    uploadedByUserId: int("uploadedByUserId").notNull().references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("chapter_audio_uploader_idx").on(table.uploadedByUserId)]
 );
 
 export const novelCategories = mysqlTable(
