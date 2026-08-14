@@ -5,6 +5,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { Menu, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 const links = [
   { href: "/novels", label: "الروايات" },
@@ -17,16 +18,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const [menuOpen, setMenuOpen] = useState(false);
   const [, navigate] = useLocation();
   const { isAuthenticated, user } = useAuth();
+  const { data: appearance } = trpc.platform.appearance.useQuery();
+  const platformName = appearance?.platformName ?? "روايتك بالعربية";
+  const tagline = appearance?.tagline ?? "بالعربية";
 
   return (
-    <div className="min-h-screen bg-background text-foreground" dir="rtl">
+    <div className="min-h-screen bg-background text-foreground" dir="rtl" style={{ "--primary": appearance?.primaryColor, "--ring": appearance?.accentColor } as React.CSSProperties}>
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="container flex h-[74px] items-center justify-between gap-5">
           <Link href="/" className="group flex items-center gap-3 text-foreground">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary font-serif text-xl text-primary-foreground transition-transform duration-200 group-hover:rotate-6">ر</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary font-serif text-xl text-primary-foreground transition-transform duration-200 group-hover:rotate-6">{platformName.slice(0, 1)}</span>
             <span>
-              <strong className="block font-serif text-xl leading-none">روايتك</strong>
-              <span className="mt-1 block text-[10px] font-semibold tracking-[0.18em] text-[#af7c42]">بالعربية</span>
+              <strong className="block font-serif text-xl leading-none">{platformName}</strong>
+              <span className="mt-1 block text-[10px] font-semibold tracking-[0.18em]" style={{ color: appearance?.accentColor }}>{tagline}</span>
             </span>
           </Link>
 
@@ -60,7 +64,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <footer className="mt-20 border-t border-[#1d2940]/10 bg-[#1d2940] text-[#f6f1e7]">
         <div className="container grid gap-10 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <div className="mb-4 font-serif text-3xl">روايتك بالعربية</div>
+            <div className="mb-4 font-serif text-3xl">{platformName}</div>
             <p className="max-w-md text-sm leading-7 text-[#f6f1e7]/70">مكتبة رقمية عربية تصنع مساحة هادئة تليق بالحكايات: اكتشف الروايات، تابع الفصول، واقرأ على مهل.</p>
           </div>
           <div className="grid content-start gap-2 text-sm text-[#f6f1e7]/75"><Link href="/novels">استكشف الروايات</Link><Link href="/authors">تعرّف إلى المؤلفين</Link><Link href="/categories">التصنيفات</Link></div>

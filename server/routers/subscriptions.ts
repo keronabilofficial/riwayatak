@@ -6,7 +6,7 @@ import { chapterAudio, chapters, subscriptionCycles, subscriptions } from "../..
 import { getDb } from "../db";
 import { createPaymobCheckout } from "../lib/paymob";
 import { expireDueSubscriptionCycles, getAudioListenerAccess } from "../lib/subscriptionAccess";
-import { SUBSCRIPTION_OPTIONS } from "../lib/subscriptions";
+import { getManagedPlan, getManagedPlans, managedPlanToSubscriptionOption } from "../lib/platformSettings";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const planInput = z.object({ planName: z.enum(["go", "plus", "ultra", "enterprise"]), billingTerm: z.enum(["monthly", "quarterly", "hundred_days", "six_months", "yearly"]) });
@@ -24,7 +24,7 @@ function getRequestOrigin(request: { get: (name: string) => string | undefined }
 }
 
 export const subscriptionsRouter = router({
-  plans: publicProcedure.query(() => SUBSCRIPTION_OPTIONS),
+  plans: publicProcedure.query(async () => (await getManagedPlans()).filter(plan => plan.enabled).map(managedPlanToSubscriptionOption)),
   mine: protectedProcedure.query(async ({ ctx }) => {
     await expireDueSubscriptionCycles(ctx.user.id);
     const database = await requireDb();
@@ -38,7 +38,8 @@ export const subscriptionsRouter = router({
     return rows[0] ?? null;
   }),
   startCheckout: protectedProcedure.input(planInput.extend({ billingEmail: z.string().email(), phoneNumber: z.string().regex(/^\+[1-9]\d{7,14}$/, "أدخل رقم هاتف بصيغة دولية مثل +201..." ) })).mutation(async ({ ctx, input }) => {
-    const option = SUBSCRIPTION_OPTIONS.find(item => item.planName === input.planName && item.billingTerm === input.billingTerm);
+    const managedPlan = await getManagedPlan(input.planName, input.billingTerm);
+    const option = managedPlan ? managedPlanToSubscriptionOption(managedPlan) : null;
     if (!option) throw new TRPCError({ code: "BAD_REQUEST", message: "خيار الاشتراك غير متاح." });
     const database = await requireDb();
     const activeRows = await database.select({ id: subscriptionCycles.id }).from(subscriptionCycles).innerJoin(subscriptions, eq(subscriptionCycles.subscriptionId, subscriptions.id)).where(and(eq(subscriptions.userId, ctx.user.id), eq(subscriptionCycles.status, "active"), gt(subscriptionCycles.endsAt, new Date()))).limit(1);
@@ -46,7 +47,15 @@ export const subscriptionsRouter = router({
     const subscriptionResult = await database.insert(subscriptions).values({ userId: ctx.user.id, planName: input.planName, billingTerm: input.billingTerm, provider: "paymob", status: "pending" });
     const subscriptionId = Number(subscriptionResult[0].insertId);
     const providerOrderId = `rw-${subscriptionId}-${randomUUID()}`;
-    const cycleResult = await database.insert(subscriptionCycles).values({ subscriptionId, providerOrderId, status: "pending" });
+    const cycleResult = await database.insert(subscriptionCycles).values({
+      subscriptionId,
+      providerOrderId,
+      status: "pending",
+      planLabelSnapshot: option.label,
+      priceEgpSnapshot: option.priceEgp,
+      novelLimitSnapshot: option.novelLimit,
+      audioChapterLimitSnapshot: option.audioChapterLimitPerNovel,
+    });
     const cycleId = Number(cycleResult[0].insertId);
     try {
       const origin = getRequestOrigin(ctx.req);

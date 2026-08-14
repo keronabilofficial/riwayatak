@@ -12,6 +12,7 @@ describe("حدود الوصول في الاشتراك", () => {
     let userId: number | undefined;
     let authorId: number | undefined;
     let novelId: number | undefined;
+    let secondNovelId: number | undefined;
     let subscriptionId: number | undefined;
 
     try {
@@ -21,17 +22,20 @@ describe("حدود الوصول في الاشتراك", () => {
       authorId = Number(author[0].insertId);
       const novel = await database.insert(novels).values({ authorId, title: "رواية اختبار", normalizedTitle: "رواية اختبار", slug: `subscription-test-novel-${marker}`, status: "draft", chapterCount: 5, createdByUserId: userId });
       novelId = Number(novel[0].insertId);
+      const secondNovel = await database.insert(novels).values({ authorId, title: "رواية حد ثابت", normalizedTitle: "رواية حد ثابت", slug: `subscription-snapshot-novel-${marker}`, status: "draft", chapterCount: 1, createdByUserId: userId });
+      secondNovelId = Number(secondNovel[0].insertId);
       const chapterRows = await database.insert(chapters).values([1, 2, 3, 4, 5].map(sortOrder => ({ novelId, title: `فصل ${sortOrder}`, slug: `subscription-test-chapter-${marker}-${sortOrder}`, sortOrder, content: "محتوى اختبار", status: "draft", createdByUserId: userId })));
       const firstChapterId = Number(chapterRows[0].insertId);
       const chapterIds = [0, 1, 2, 3, 4].map(offset => firstChapterId + offset);
       const subscription = await database.insert(subscriptions).values({ userId, planName: "go", billingTerm: "monthly", provider: "paymob", status: "active" });
       subscriptionId = Number(subscription[0].insertId);
       const endsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      const cycle = await database.insert(subscriptionCycles).values({ subscriptionId, providerOrderId: `subscription-test-order-${marker}`, status: "active", startsAt: new Date(), endsAt });
+      const cycle = await database.insert(subscriptionCycles).values({ subscriptionId, providerOrderId: `subscription-test-order-${marker}`, status: "active", planLabelSnapshot: "Go ثابت", priceEgpSnapshot: 50, novelLimitSnapshot: 1, audioChapterLimitSnapshot: 2, startsAt: new Date(), endsAt });
       const cycleId = Number(cycle[0].insertId);
 
       expect(await getReaderAccess(undefined, { novelId, sortOrder: 2 })).toMatchObject({ allowed: true, kind: "preview" });
       expect(await getReaderAccess(userId, { novelId, sortOrder: 3 })).toMatchObject({ allowed: true, kind: "subscription", planName: "go" });
+      expect(await getReaderAccess(userId, { novelId: secondNovelId, sortOrder: 3 })).toMatchObject({ allowed: false, kind: "locked" });
       const novelAccess = await database.select().from(subscriptionNovelAccess).where(eq(subscriptionNovelAccess.cycleId, cycleId));
       expect(novelAccess).toHaveLength(1);
 
@@ -43,6 +47,7 @@ describe("حدود الوصول في الاشتراك", () => {
     } finally {
       if (subscriptionId) await database.delete(subscriptions).where(eq(subscriptions.id, subscriptionId));
       if (novelId) await database.delete(chapters).where(eq(chapters.novelId, novelId));
+      if (secondNovelId) await database.delete(novels).where(eq(novels.id, secondNovelId));
       if (novelId) await database.delete(novels).where(eq(novels.id, novelId));
       if (authorId) await database.delete(authors).where(eq(authors.id, authorId));
       if (userId) await database.delete(users).where(eq(users.id, userId));

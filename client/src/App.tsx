@@ -24,6 +24,7 @@ import AdminAds from "./pages/admin/AdminAds";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminTaxonomy from "./pages/admin/AdminTaxonomy";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminPlatformSettings from "./pages/admin/AdminPlatformSettings";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -46,6 +47,7 @@ function Router() {
       <Route path={"/admin/taxonomy"} component={AdminTaxonomy} />
       <Route path={"/admin/users"} component={AdminUsers} />
       <Route path={"/admin/operations"} component={AdminOperations} />
+      <Route path={"/admin/platform"} component={AdminPlatformSettings} />
       <Route path={"/admin/media"} component={AdminMedia} />
       <Route path={"/admin/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>

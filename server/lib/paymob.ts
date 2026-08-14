@@ -64,13 +64,14 @@ export async function validatePaymobCredentials(request: typeof fetch = fetch) {
 
 export async function createPaymobCheckout(input: PaymobCheckoutInput, configuration = getPaymobConfiguration(), request: typeof fetch = fetch) {
   const [firstName, ...remainingName] = input.customerName.trim().split(/\s+/);
-  const response = await request(intentionUrl, {
-    method: "POST",
-    headers: { Authorization: `Token ${configuration.secretKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const createIntention = async (paymentMethods: Array<number | "card">) => {
+    const response = await request(intentionUrl, {
+      method: "POST",
+      headers: { Authorization: `Token ${configuration.secretKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
       amount: input.amountCents,
       currency: "EGP",
-      payment_methods: [configuration.cardIntegrationId],
+      payment_methods: paymentMethods,
       items: [{ name: input.description, amount: input.amountCents, description: input.description, quantity: 1 }],
       billing_data: {
         first_name: firstName || "قارئ",
@@ -82,9 +83,15 @@ export async function createPaymobCheckout(input: PaymobCheckoutInput, configura
       special_reference: input.merchantReference,
       notification_url: input.notificationUrl,
       redirection_url: input.redirectionUrl,
-    }),
-  });
-  const body = await response.json().catch(() => null) as { client_secret?: string; detail?: string; message?: string } | null;
+      }),
+    });
+    const body = await response.json().catch(() => null) as { client_secret?: string; detail?: string; message?: string } | null;
+    return { response, body };
+  };
+
+  let { response, body } = await createIntention([configuration.cardIntegrationId]);
+  const integrationRejected = !response.ok && /integration id does not exist/i.test(`${body?.detail ?? ""} ${body?.message ?? ""}`);
+  if (integrationRejected) ({ response, body } = await createIntention(["card"]));
   if (!response.ok || !body?.client_secret) {
     throw new Error(body?.detail || body?.message || "تعذر إنشاء جلسة دفع Paymob.");
   }

@@ -9,10 +9,9 @@ import { ArrowLeft, BookOpen, Feather, Search } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
-const heroImage = "/manus-storage/riwayatak-hero-library_c40163e2.jpg";
-
 export default function Home() {
   const { data, isLoading } = trpc.catalog.home.useQuery();
+  const { data: appearance } = trpc.platform.appearance.useQuery();
   const [query, setQuery] = useState("");
   const [, navigate] = useLocation();
   const featured = data?.featured ?? [];
@@ -21,14 +20,14 @@ export default function Home() {
   const submitSearch = (event: React.FormEvent) => { event.preventDefault(); navigate(`/search?q=${encodeURIComponent(query.trim())}`); };
 
   return <PublicLayout>
-    <section className="relative isolate overflow-hidden bg-[#1d2940] text-[#f6f1e7]">
-      <div className="absolute inset-0 -z-20 bg-cover bg-center opacity-65" style={{ backgroundImage: `url(${heroImage})` }} />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(20,31,51,.99)_0%,rgba(25,38,61,.92)_45%,rgba(29,41,64,.40)_100%)]" />
+    <section className="relative isolate overflow-hidden text-[#f6f1e7]" style={{ backgroundColor: appearance?.primaryColor ?? "#1d2940" }}>
+      <div className="absolute inset-0 -z-20 bg-cover bg-center opacity-65" style={{ backgroundImage: `url(${appearance?.heroImageUrl ?? "/manus-storage/riwayatak-hero-library_c40163e2.jpg"})` }} />
+      <div className="absolute inset-0 -z-10" style={{ background: `linear-gradient(90deg, ${appearance?.primaryColor ?? "#1d2940"}fa 0%, ${appearance?.primaryColor ?? "#1d2940"}dd 45%, ${appearance?.primaryColor ?? "#1d2940"}66 100%)` }} />
       <div className="container grid min-h-[570px] items-center py-20 md:py-28">
         <div className="max-w-2xl">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#d5a85e]/35 bg-[#d5a85e]/10 px-4 py-2 text-xs font-bold text-[#ead7ad]"><Feather className="h-4 w-4" />مساحة عربية للحكايات التي تبقى</div>
-          <h1 className="font-serif text-5xl leading-[1.13] md:text-7xl">حكاية واحدة<br /><span className="text-[#d5a85e]">قادرة على</span> تغيير مساءك.</h1>
-          <p className="mt-7 max-w-xl text-lg leading-8 text-[#f6f1e7]/75">اكتشف روايات عربية مختارة، واقرأ فصولها في مساحة مصممة لتترك اللغة تتنفس.</p>
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold" style={{ borderColor: `${appearance?.accentColor ?? "#d5a85e"}66`, backgroundColor: `${appearance?.accentColor ?? "#d5a85e"}1a`, color: appearance?.accentColor ?? "#ead7ad" }}><Feather className="h-4 w-4" />{appearance?.heroEyebrow ?? "مساحة عربية للحكايات التي تبقى"}</div>
+          <h1 className="font-serif text-5xl leading-[1.13] md:text-7xl">{appearance?.heroTitle ?? "حكاية واحدة"}<br /><span style={{ color: appearance?.accentColor ?? "#d5a85e" }}>{appearance?.heroHighlight ?? "قادرة على"}</span> تغيير مساءك.</h1>
+          <p className="mt-7 max-w-xl text-lg leading-8 text-[#f6f1e7]/75">{appearance?.heroDescription ?? "اكتشف روايات عربية مختارة، واقرأ فصولها في مساحة مصممة لتترك اللغة تتنفس."}</p>
           <form onSubmit={submitSearch} className="mt-9 flex max-w-lg items-center gap-2 rounded-2xl bg-white p-2 shadow-2xl shadow-black/20">
             <Search className="mr-2 h-5 w-5 text-[#7d8796]" /><Input value={query} onChange={event => setQuery(event.target.value)} placeholder="ابحث عن عنوان أو مؤلف أو وسم..." className="h-11 border-0 bg-transparent text-[#1d2940] shadow-none focus-visible:ring-0" /><Button type="submit" className="h-11 bg-[#af7c42] px-6 text-white hover:bg-[#936536]">بحث</Button>
           </form>

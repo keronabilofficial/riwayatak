@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, Image, LayoutDashboard, LogOut, Megaphone, PanelLeft, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
+import { BookOpen, Image, LayoutDashboard, LogOut, Megaphone, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -36,6 +36,7 @@ const menuItems = [
   { icon: Megaphone, label: "الإعلانات", path: "/admin/ads" },
   { icon: ShieldCheck, label: "المستخدمون", path: "/admin/users" },
   { icon: Workflow, label: "التشغيل", path: "/admin/operations" },
+  { icon: Settings2, label: "المنصة والباقات", path: "/admin/platform" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

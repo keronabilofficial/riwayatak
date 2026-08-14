@@ -1,7 +1,8 @@
 import { and, count, eq, gt, lte } from "drizzle-orm";
 import { subscriptionAudioAccess, subscriptionCycles, subscriptionNovelAccess, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { getSubscriptionOption, isFreePreviewChapter } from "./subscriptions";
+import { getManagedPlan, managedPlanToSubscriptionOption } from "./platformSettings";
+import { isFreePreviewChapter } from "./subscriptions";
 
 type ChapterAccessInput = { novelId: number; sortOrder: number };
 
@@ -9,7 +10,7 @@ async function getActiveCycle(userId: number) {
   const database = await getDb();
   if (!database) throw new Error("قاعدة البيانات غير متاحة مؤقتًا.");
   const rows = await database
-    .select({ cycleId: subscriptionCycles.id, planName: subscriptions.planName, billingTerm: subscriptions.billingTerm, endsAt: subscriptionCycles.endsAt })
+    .select({ cycleId: subscriptionCycles.id, planName: subscriptions.planName, billingTerm: subscriptions.billingTerm, endsAt: subscriptionCycles.endsAt, planLabelSnapshot: subscriptionCycles.planLabelSnapshot, novelLimitSnapshot: subscriptionCycles.novelLimitSnapshot, audioChapterLimitSnapshot: subscriptionCycles.audioChapterLimitSnapshot })
     .from(subscriptionCycles)
     .innerJoin(subscriptions, eq(subscriptionCycles.subscriptionId, subscriptions.id))
     .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, "active"), eq(subscriptionCycles.status, "active"), gt(subscriptionCycles.endsAt, new Date())))
@@ -23,7 +24,9 @@ export async function getReaderAccess(userId: number | undefined, chapter: Chapt
 
   const { database, cycle } = await getActiveCycle(userId);
   if (!cycle) return { allowed: false as const, kind: "locked" as const, reason: "يلزم اشتراك نشط لقراءة هذا الفصل." };
-  const option = getSubscriptionOption(cycle.planName, cycle.billingTerm);
+  const managedPlan = cycle.novelLimitSnapshot > 0 ? null : await getManagedPlan(cycle.planName, cycle.billingTerm);
+  if (!managedPlan && cycle.novelLimitSnapshot < 1) return { allowed: false as const, kind: "locked" as const, reason: "تعذر قراءة شروط باقتك الحالية. تواصل مع إدارة المنصة." };
+  const option = managedPlan ? managedPlanToSubscriptionOption(managedPlan) : { planName: cycle.planName, billingTerm: cycle.billingTerm, label: cycle.planLabelSnapshot ?? cycle.planName, priceEgp: 0, novelLimit: cycle.novelLimitSnapshot, audioChapterLimitPerNovel: cycle.audioChapterLimitSnapshot };
   const existing = await database.select({ id: subscriptionNovelAccess.id }).from(subscriptionNovelAccess).where(and(eq(subscriptionNovelAccess.cycleId, cycle.cycleId), eq(subscriptionNovelAccess.novelId, chapter.novelId))).limit(1);
   if (existing[0]) return { allowed: true as const, kind: "subscription" as const, planName: cycle.planName, endsAt: cycle.endsAt };
 
@@ -36,7 +39,9 @@ export async function getReaderAccess(userId: number | undefined, chapter: Chapt
 export async function getAudioListenerAccess(userId: number, chapter: { chapterId: number; novelId: number }) {
   const { database, cycle } = await getActiveCycle(userId);
   if (!cycle) return { allowed: false as const, reason: "يلزم اشتراك نشط للاستماع إلى الفصول الصوتية." };
-  const option = getSubscriptionOption(cycle.planName, cycle.billingTerm);
+  const managedPlan = cycle.novelLimitSnapshot > 0 ? null : await getManagedPlan(cycle.planName, cycle.billingTerm);
+  if (!managedPlan && cycle.novelLimitSnapshot < 1) return { allowed: false as const, reason: "تعذر قراءة شروط باقتك الحالية. تواصل مع إدارة المنصة." };
+  const option = managedPlan ? managedPlanToSubscriptionOption(managedPlan) : { planName: cycle.planName, billingTerm: cycle.billingTerm, label: cycle.planLabelSnapshot ?? cycle.planName, priceEgp: 0, novelLimit: cycle.novelLimitSnapshot, audioChapterLimitPerNovel: cycle.audioChapterLimitSnapshot };
   const existing = await database.select({ id: subscriptionAudioAccess.id }).from(subscriptionAudioAccess).where(and(eq(subscriptionAudioAccess.cycleId, cycle.cycleId), eq(subscriptionAudioAccess.chapterId, chapter.chapterId))).limit(1);
   if (existing[0]) return { allowed: true as const, planName: cycle.planName };
   const used = await database.select({ value: count() }).from(subscriptionAudioAccess).where(and(eq(subscriptionAudioAccess.cycleId, cycle.cycleId), eq(subscriptionAudioAccess.novelId, chapter.novelId)));
