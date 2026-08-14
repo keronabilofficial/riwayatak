@@ -57,6 +57,20 @@
       "when": 1786728957594,
       "tag": "0007_sweet_hardball",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786739575328,
+      "tag": "0008_flashy_susan_delgado",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1786740431181,
+      "tag": "0009_romantic_robin_chapel",
+      "breakpoints": true
     }
   ]
 }

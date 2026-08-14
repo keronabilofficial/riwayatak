@@ -24,6 +24,7 @@ import { normalizeArabic, toSlug } from "../lib/arabic";
 import { getUserAccessUpdateError } from "../lib/access";
 import { mapChapterOrder } from "../lib/chapters";
 import { reviewInputSchema } from "../lib/reviews";
+import { getReaderAccess } from "../lib/subscriptionAccess";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
@@ -61,7 +62,14 @@ export const catalogRouter = router({
   listAuthors: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional() })).query(({ input }) => listPublicAuthors(input)),
   author: publicProcedure.input(z.object({ slug: z.string().min(1).max(220) })).query(({ input }) => getPublicAuthor(input.slug)),
   categories: publicProcedure.query(() => listPublicCategories()),
-  read: publicProcedure.input(z.object({ novelSlug: z.string().min(1), chapterSlug: z.string().min(1) })).query(({ input }) => getPublicChapter(input.novelSlug, input.chapterSlug)),
+  read: publicProcedure.input(z.object({ novelSlug: z.string().min(1), chapterSlug: z.string().min(1) })).query(async ({ ctx, input }) => {
+    const chapter = await getPublicChapter(input.novelSlug, input.chapterSlug);
+    if (!chapter) return null;
+    const access = await getReaderAccess(ctx.user?.id, { novelId: chapter.novelId, sortOrder: chapter.sortOrder });
+    const { audioUrl, ...safeChapter } = chapter;
+    if (!access.allowed) return { ...safeChapter, content: "", hasAudio: Boolean(audioUrl), access };
+    return { ...safeChapter, hasAudio: Boolean(audioUrl), access };
+  }),
   recordView: publicProcedure.input(z.object({ novelId: z.number().int(), chapterId: z.number().int().optional(), eventType: z.enum(["novel_view", "chapter_open", "chapter_complete"]) })).mutation(async ({ input }) => {
     const db = await requireDb();
     await db.insert(readingEvents).values({ novelId: input.novelId, chapterId: input.chapterId, eventType: input.eventType });

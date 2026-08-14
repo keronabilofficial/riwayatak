@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
-import { ArrowRight, ChevronLeft, ChevronRight, Headphones, List, Moon, Sun } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Headphones, List, LockKeyhole, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 
@@ -12,11 +12,13 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
   const { theme, toggleTheme } = useTheme();
   const dark = theme === "dark";
   const [toc, setToc] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const recordView = trpc.catalog.recordView.useMutation();
   const saveProgress = trpc.library.saveProgress.useMutation();
+  const listenChapter = trpc.subscriptions.listenChapter.useMutation({ onSuccess: result => setAudioUrl(result.audioUrl) });
 
   useEffect(() => {
-    if (!chapter) return;
+    if (!chapter || !chapter.access.allowed) return;
     recordView.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, eventType: "chapter_open" });
     if (isAuthenticated) saveProgress.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, characterOffset: 0, progressPercent: 0, isCompleted: false });
   }, [chapter?.chapterId, chapter?.novelId, isAuthenticated]);
@@ -41,8 +43,10 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
         <p className="text-center text-sm font-semibold text-[#af7c42]">{chapter.novelTitle}</p>
         <h1 className="mt-3 text-center font-serif text-4xl leading-tight md:text-5xl">{chapter.chapterTitle}</h1>
         <div className="mx-auto mt-5 h-px w-16 bg-[#af7c42]" />
-        {chapter.audioUrl && <section className="mx-auto mt-7 max-w-xl rounded-2xl border border-current/10 bg-current/5 p-4"><div className="flex items-center gap-2 text-sm font-bold"><Headphones className="h-4 w-4 text-[#af7c42]" />استمع إلى الفصل</div><audio controls preload="metadata" src={chapter.audioUrl} className="mt-3 w-full" /></section>}
-        <article className="mt-12 font-serif text-[1.22rem] leading-[2.35] md:text-[1.35rem]">{paragraphs.map((paragraph, index) => <p key={index} className="mb-8">{paragraph}</p>)}</article>
+        {!chapter.access.allowed ? <section className="mx-auto mt-10 max-w-xl rounded-3xl border border-[#af7c42]/30 bg-card p-7 text-center shadow-sm"><LockKeyhole className="mx-auto h-7 w-7 text-[#af7c42]" /><h2 className="mt-4 font-serif text-2xl">هذا الفصل متاح للمشتركين</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">{chapter.access.reason}</p><Link href="/plans" className="mt-5 inline-flex rounded-xl bg-[#af7c42] px-5 py-3 text-sm font-bold text-white">عرض الباقات</Link></section> : <>
+          {chapter.hasAudio && <section className="mx-auto mt-7 max-w-xl rounded-2xl border border-current/10 bg-current/5 p-4"><div className="flex items-center gap-2 text-sm font-bold"><Headphones className="h-4 w-4 text-[#af7c42]" />استمع إلى الفصل</div>{audioUrl ? <audio controls preload="metadata" src={audioUrl} className="mt-3 w-full" /> : <button type="button" onClick={() => listenChapter.mutate({ chapterId: chapter.chapterId })} disabled={listenChapter.isPending} className="mt-3 rounded-lg bg-[#af7c42] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{listenChapter.isPending ? "جارٍ التحقق..." : "بدء الاستماع"}</button>}{listenChapter.error && <p className="mt-3 text-sm text-destructive">{listenChapter.error.message}</p>}</section>}
+          <article className="mt-12 font-serif text-[1.22rem] leading-[2.35] md:text-[1.35rem]">{paragraphs.map((paragraph, index) => <p key={index} className="mb-8">{paragraph}</p>)}</article>
+        </>}
         <nav className="mt-14 flex items-center justify-between gap-4 border-t border-current/10 pt-7">
           {chapter.previous ? <Link href={`/read/${chapter.novelSlug}/${chapter.previous.slug}`} className="inline-flex items-center gap-2 text-sm font-bold hover:text-[#af7c42]"><ChevronRight className="h-5 w-5" /><span><small className="block font-normal opacity-60">السابق</small>{chapter.previous.title}</span></Link> : <span />}
           {chapter.next ? <Link href={`/read/${chapter.novelSlug}/${chapter.next.slug}`} className="inline-flex items-center gap-2 text-left text-sm font-bold hover:text-[#af7c42]"><span><small className="block font-normal opacity-60">التالي</small>{chapter.next.title}</span><ChevronLeft className="h-5 w-5" /></Link> : <span />}

@@ -14,6 +14,8 @@ import NovelDetail from "./pages/NovelDetail";
 import Novels from "./pages/Novels";
 import Reader from "./pages/Reader";
 import SearchPage from "./pages/SearchPage";
+import Plans from "./pages/Plans";
+import SubscriptionReturn from "./pages/SubscriptionReturn";
 import AdminAuthors from "./pages/admin/AdminAuthors";
 import AdminNovels from "./pages/admin/AdminNovels";
 import AdminOperations from "./pages/admin/AdminOperations";
@@ -36,6 +38,8 @@ function Router() {
       <Route path={"/categories/:slug"} component={Novels} />
       <Route path={"/read/:novelSlug/:chapterSlug"}>{params => <Reader novelSlug={params.novelSlug} chapterSlug={params.chapterSlug} />}</Route>
       <Route path={"/search"} component={SearchPage} />
+      <Route path={"/plans"} component={Plans} />
+      <Route path={"/subscription/return"} component={SubscriptionReturn} />
       <Route path={"/admin"} component={AdminOverview} />
       <Route path={"/admin/authors"} component={AdminAuthors} />
       <Route path={"/admin/novels"} component={AdminNovels} />

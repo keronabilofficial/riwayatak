@@ -10,6 +10,7 @@ const links = [
   { href: "/novels", label: "الروايات" },
   { href: "/authors", label: "المؤلفون" },
   { href: "/categories", label: "التصنيفات" },
+  { href: "/plans", label: "الباقات" },
 ];
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {

@@ -13,6 +13,10 @@ import {
 } from "drizzle-orm/mysql-core";
 
 export const publicationStatus = ["draft", "review", "published", "unpublished", "archived"] as const;
+export const subscriptionPlanName = ["go", "plus", "ultra", "enterprise"] as const;
+export const subscriptionBillingTerm = ["monthly", "quarterly", "hundred_days", "six_months", "yearly"] as const;
+export const subscriptionStatus = ["pending", "active", "past_due", "cancelled", "expired"] as const;
+export const subscriptionCycleStatus = ["pending", "active", "expired", "failed"] as const;
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -321,6 +325,63 @@ export const backupRuns = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [index("backup_runs_status_idx").on(table.status, table.createdAt)]
+);
+
+export const subscriptions = mysqlTable(
+  "subscriptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    planName: mysqlEnum("planName", subscriptionPlanName).notNull(),
+    billingTerm: mysqlEnum("billingTerm", subscriptionBillingTerm).notNull(),
+    provider: varchar("provider", { length: 32 }).default("paymob").notNull(),
+    providerSubscriptionId: varchar("providerSubscriptionId", { length: 255 }).unique(),
+    status: mysqlEnum("status", subscriptionStatus).default("pending").notNull(),
+    cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
+    cancelledAt: timestamp("cancelledAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("subscriptions_user_status_idx").on(table.userId, table.status)]
+);
+
+export const subscriptionCycles = mysqlTable(
+  "subscription_cycles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    subscriptionId: int("subscriptionId").notNull().references(() => subscriptions.id, { onDelete: "cascade" }),
+    providerOrderId: varchar("providerOrderId", { length: 255 }).notNull().unique(),
+    providerTransactionId: varchar("providerTransactionId", { length: 255 }).unique(),
+    status: mysqlEnum("status", subscriptionCycleStatus).default("pending").notNull(),
+    startsAt: timestamp("startsAt"),
+    endsAt: timestamp("endsAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("subscription_cycles_access_idx").on(table.status, table.endsAt), index("subscription_cycles_subscription_idx").on(table.subscriptionId, table.createdAt)]
+);
+
+export const subscriptionNovelAccess = mysqlTable(
+  "subscription_novel_access",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    cycleId: int("cycleId").notNull().references(() => subscriptionCycles.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("subscription_novel_access_cycle_novel_unique").on(table.cycleId, table.novelId), index("subscription_novel_access_cycle_idx").on(table.cycleId)]
+);
+
+export const subscriptionAudioAccess = mysqlTable(
+  "subscription_audio_access",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    cycleId: int("cycleId").notNull().references(() => subscriptionCycles.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id),
+    chapterId: int("chapterId").notNull().references(() => chapters.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("subscription_audio_access_cycle_chapter_unique").on(table.cycleId, table.chapterId), index("subscription_audio_access_cycle_novel_idx").on(table.cycleId, table.novelId)]
 );
 
 export const scheduledJobs = mysqlTable("scheduled_jobs", {
