@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { getDisabledAccountError } from "../lib/access";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -310,6 +311,9 @@ class SDKServer {
     if (!user) {
       throw ForbiddenError("User not found");
     }
+
+    const disabledAccountError = getDisabledAccountError(user.isDisabled);
+    if (disabledAccountError) throw ForbiddenError(disabledAccountError);
 
     await db.upsertUser({
       openId: user.openId,

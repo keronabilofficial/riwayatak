@@ -1,0 +1,29 @@
+import { and, asc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { adSlots } from "../../drizzle/schema";
+import * as db from "../db";
+import { adminProcedure, publicProcedure, router } from "../_core/trpc";
+
+const placement = z.enum(["home", "category", "novel", "reader"]);
+
+export const adsRouter = router({
+  placement: publicProcedure.input(z.object({ placement })).query(async ({ input }) => {
+    const database = await db.getDb();
+    if (!database || input.placement === "reader") return [];
+    return database.select({ id: adSlots.id, label: adSlots.label, provider: adSlots.provider, slotCode: adSlots.slotCode }).from(adSlots).where(and(eq(adSlots.placement, input.placement), eq(adSlots.isEnabled, true))).orderBy(asc(adSlots.id));
+  }),
+  list: adminProcedure.query(async () => {
+    const database = await db.getDb();
+    if (!database) throw new Error("قاعدة البيانات غير متاحة.");
+    return database.select().from(adSlots).orderBy(asc(adSlots.placement), asc(adSlots.id));
+  }),
+  upsert: adminProcedure.input(z.object({ id: z.number().int().optional(), placement, label: z.string().min(2).max(120), provider: z.string().max(80).optional(), slotCode: z.string().max(255).optional(), isEnabled: z.boolean().default(false) })).mutation(async ({ input }) => {
+    const database = await db.getDb();
+    if (!database) throw new Error("قاعدة البيانات غير متاحة.");
+    if (input.placement === "reader") throw new Error("لا يُسمح بوضع إعلانات في صفحة القراءة.");
+    const values = { placement: input.placement, label: input.label, provider: input.provider, slotCode: input.slotCode, isEnabled: input.isEnabled };
+    if (input.id) { await database.update(adSlots).set(values).where(eq(adSlots.id, input.id)); return { id: input.id }; }
+    const result = await database.insert(adSlots).values(values);
+    return { id: Number(result[0].insertId) };
+  }),
+});

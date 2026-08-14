@@ -21,15 +21,21 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { BookOpen, Image, LayoutDashboard, LogOut, Megaphone, PanelLeft, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "نظرة عامة", path: "/admin" },
+  { icon: Users, label: "المؤلفون", path: "/admin/authors" },
+  { icon: BookOpen, label: "الروايات والفصول", path: "/admin/novels" },
+  { icon: Tags, label: "التصنيفات والوسوم", path: "/admin/taxonomy" },
+  { icon: Image, label: "الوسائط", path: "/admin/media" },
+  { icon: Megaphone, label: "الإعلانات", path: "/admin/ads" },
+  { icon: ShieldCheck, label: "المستخدمون", path: "/admin/users" },
+  { icon: Workflow, label: "التشغيل", path: "/admin/operations" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -61,19 +67,15 @@ export default function DashboardLayout({
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
-            </p>
+            <h1 className="font-serif text-3xl font-semibold tracking-tight text-center">سجّل الدخول للمتابعة</h1>
+            <p className="max-w-sm text-center text-sm text-muted-foreground">تحتاج لوحة الإدارة إلى حساب موثق بصلاحية مناسبة.</p>
           </div>
           <Button
             onClick={() => startLogin()}
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            تسجيل الدخول
           </Button>
         </div>
       </div>
@@ -154,7 +156,8 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r-0"
+          side="right"
+          className="border-l-0"
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-16 justify-center">
@@ -162,15 +165,13 @@ function DashboardLayoutContent({
               <button
                 onClick={toggleSidebar}
                 className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
-                aria-label="Toggle navigation"
+                aria-label="تبديل القائمة"
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
-                  </span>
+                  <span className="font-semibold tracking-tight truncate">إدارة روايتك</span>
                 </div>
               ) : null}
             </div>

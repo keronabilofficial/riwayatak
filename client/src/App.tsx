@@ -4,13 +4,48 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AuthorDetail from "./pages/AuthorDetail";
+import Authors from "./pages/Authors";
+import Categories from "./pages/Categories";
 import Home from "./pages/Home";
+import Legal from "./pages/Legal";
+import Library from "./pages/Library";
+import NovelDetail from "./pages/NovelDetail";
+import Novels from "./pages/Novels";
+import Reader from "./pages/Reader";
+import SearchPage from "./pages/SearchPage";
+import AdminAuthors from "./pages/admin/AdminAuthors";
+import AdminNovels from "./pages/admin/AdminNovels";
+import AdminOperations from "./pages/admin/AdminOperations";
+import AdminMedia from "./pages/admin/AdminMedia";
+import AdminAds from "./pages/admin/AdminAds";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminTaxonomy from "./pages/admin/AdminTaxonomy";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/novels"} component={Novels} />
+      <Route path={"/novels/:slug"}>{params => <NovelDetail slug={params.slug} />}</Route>
+      <Route path={"/authors"} component={Authors} />
+      <Route path={"/authors/:slug"}>{params => <AuthorDetail slug={params.slug} />}</Route>
+      <Route path={"/categories"} component={Categories} />
+      <Route path={"/categories/:slug"} component={Novels} />
+      <Route path={"/read/:novelSlug/:chapterSlug"}>{params => <Reader novelSlug={params.novelSlug} chapterSlug={params.chapterSlug} />}</Route>
+      <Route path={"/search"} component={SearchPage} />
+      <Route path={"/admin"} component={AdminOverview} />
+      <Route path={"/admin/authors"} component={AdminAuthors} />
+      <Route path={"/admin/novels"} component={AdminNovels} />
+      <Route path={"/admin/taxonomy"} component={AdminTaxonomy} />
+      <Route path={"/admin/users"} component={AdminUsers} />
+      <Route path={"/admin/operations"} component={AdminOperations} />
+      <Route path={"/admin/media"} component={AdminMedia} />
+      <Route path={"/admin/ads"} component={AdminAds} />
+      <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
+      <Route path={"/library"} component={Library} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
