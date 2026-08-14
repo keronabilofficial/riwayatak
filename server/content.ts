@@ -36,8 +36,8 @@ export type CatalogInput = {
   categorySlug?: string;
 };
 
-export async function listPublicNovels(input: CatalogInput = {}) {
-  const db = await getDb();
+export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const db = dbOverride ?? await getDb();
   if (!db) return [];
   const limit = Math.min(Math.max(input.limit ?? 18, 1), 48);
   const offset = Math.max(input.offset ?? 0, 0);
