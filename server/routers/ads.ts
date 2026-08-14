@@ -27,4 +27,12 @@ export const adsRouter = router({
     const result = await database.insert(adSlots).values(values);
     return { id: Number(result[0].insertId) };
   }),
+  delete: superAdminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
+    const database = await db.getDb();
+    if (!database) throw new Error("قاعدة البيانات غير متاحة.");
+    const existing = await database.select({ id: adSlots.id }).from(adSlots).where(eq(adSlots.id, input.id)).limit(1);
+    if (!existing.length) throw new Error("تعذر العثور على موضع الإعلان المطلوب.");
+    await database.delete(adSlots).where(eq(adSlots.id, input.id));
+    return { deletedId: input.id };
+  }),
 });
