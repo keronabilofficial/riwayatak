@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
-import { Megaphone, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { Link2, Megaphone, Pencil, Plus, Save, Trash2, Unplug, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type Placement = "home" | "category" | "novel";
@@ -18,13 +18,17 @@ const placementLabels: Record<Placement, string> = { home: "الرئيسية", c
 export default function AdminAds() {
   const utils = trpc.useUtils();
   const { data } = trpc.ads.list.useQuery();
+  const { data: connection, isLoading: isConnectionLoading } = trpc.ads.connection.useQuery();
   const [form, setForm] = useState<AdForm>(blankForm);
   const [slotPendingDeletion, setSlotPendingDeletion] = useState<{ id: number; label: string }>();
   const save = trpc.ads.upsert.useMutation({ onSuccess: () => { toast.success(form.id ? "حُدّث موضع الإعلان." : "أُنشئ موضع الإعلان."); setForm(blankForm()); utils.ads.list.invalidate(); }, onError: error => toast.error(error.message) });
   const deleteSlot = trpc.ads.delete.useMutation({ onSuccess: () => { toast.success("حُذف موضع الإعلان."); setSlotPendingDeletion(undefined); utils.ads.list.invalidate(); }, onError: error => toast.error(error.message) });
+  const disconnect = trpc.ads.disconnect.useMutation({ onSuccess: () => { toast.success("فُصل حساب Google AdSense."); utils.ads.connection.invalidate(); }, onError: error => toast.error(error.message) });
+  useEffect(() => { const publisherId = connection?.publisherId; if (publisherId) setForm(current => current.adSensePublisherId ? current : { ...current, adSensePublisherId: publisherId }); }, [connection?.publisherId]);
   const edit = (item: NonNullable<typeof data>[number]) => setForm({ id: item.id, placement: item.placement as Placement, label: item.label, adSensePublisherId: item.adSensePublisherId || "", slotCode: item.slotCode || "", isEnabled: item.isEnabled });
 
   return <AdminShell requireAdmin title="إعلانات Google AdSense" description="أدخل معرّف الناشر ورمز موضع الإعلان لتُعرض الإعلانات الحقيقية في الصفحات العامة فقط. صفحة القراءة مستثناة دائمًا.">
+    <section className="mb-7 rounded-2xl border border-primary/25 bg-primary/5 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold tracking-[.14em] text-primary">الربط المباشر</p><h2 className="mt-1 font-serif text-2xl">حساب Google AdSense</h2>{isConnectionLoading ? <p className="mt-2 text-sm text-muted-foreground">جارٍ التحقق من حالة الربط...</p> : connection ? <p className="mt-2 text-sm text-muted-foreground">متصل بالحساب <strong className="text-foreground">{connection.displayName}</strong>{connection.publisherId ? <> · <span dir="ltr">{connection.publisherId}</span></> : null}</p> : <p className="mt-2 text-sm text-muted-foreground">اربط حسابك مباشرة عبر Google ليتحقق النظام من حساب AdSense ومعرّف الناشر.</p>}</div>{connection ? <Button type="button" variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}><Unplug className="ml-2 h-4 w-4" />{disconnect.isPending ? "جارٍ الفصل..." : "فصل الحساب"}</Button> : <Button type="button" onClick={() => window.location.assign("/api/adsense/oauth/start")}><Link2 className="ml-2 h-4 w-4" />ربط Google AdSense</Button>}</div></section>
     <div className="mb-7 rounded-2xl border border-amber-300/45 bg-amber-50 p-4 text-sm leading-7 text-amber-950">استخدم معرّف الناشر بالشكل <code dir="ltr">ca-pub-1234567890123456</code> ورمز الموضع الرقمي من حساب Google AdSense. لا تُفعّل موضعًا قبل الموافقة على الموقع وإعداد وحدته في AdSense.</div>
     <div className="grid gap-7 lg:grid-cols-[400px_1fr]">
       <form className="rounded-2xl border border-[#1d2940]/10 bg-white p-5" onSubmit={event => { event.preventDefault(); save.mutate({ ...form, provider: "adsense" }); }}>

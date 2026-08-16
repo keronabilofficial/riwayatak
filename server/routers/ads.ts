@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adSlots } from "../../drizzle/schema";
 import * as db from "../db";
 import { publicProcedure, router, superAdminProcedure } from "../_core/trpc";
+import { disconnectAdSense, getAdSenseConnection } from "../lib/adsenseOAuth";
 
 const placement = z.enum(["home", "category", "novel", "reader"]);
 
@@ -16,6 +17,11 @@ export const adsRouter = router({
     const database = await db.getDb();
     if (!database) throw new Error("قاعدة البيانات غير متاحة.");
     return database.select().from(adSlots).orderBy(asc(adSlots.placement), asc(adSlots.id));
+  }),
+  connection: superAdminProcedure.query(() => getAdSenseConnection()),
+  disconnect: superAdminProcedure.mutation(async () => {
+    await disconnectAdSense();
+    return { success: true };
   }),
   upsert: superAdminProcedure.input(z.object({ id: z.number().int().optional(), placement, label: z.string().min(2).max(120), provider: z.literal("adsense").default("adsense"), adSensePublisherId: z.string().regex(/^ca-pub-\d{16}$/, "أدخل معرّف ناشر AdSense بالشكل ca-pub-XXXXXXXXXXXXXXX.").optional().or(z.literal("")), slotCode: z.string().regex(/^\d+$/, "رمز موضع AdSense يجب أن يكون رقمًا.").optional().or(z.literal("")), isEnabled: z.boolean().default(false) })).mutation(async ({ input }) => {
     const database = await db.getDb();
