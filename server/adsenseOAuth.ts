@@ -2,7 +2,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { users } from "../drizzle/schema";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getDb } from "./db";
+import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { exchangeAdSenseAuthorizationCode, fetchAdSenseAccount, getAdSenseAuthorizationUrl, saveAdSenseConnection } from "./lib/adsenseOAuth";
 
@@ -62,6 +64,8 @@ export function registerAdSenseOAuthRoutes(app: Express) {
       const tokens = await exchangeAdSenseAuthorizationCode(code);
       const account = await fetchAdSenseAccount(tokens.accessToken);
       await saveAdSenseConnection({ ...account, refreshToken: tokens.refreshToken }, user.id);
+      const sessionToken = await sdk.createSessionToken(user.openId, { name: user.name || "", expiresInMs: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
       returnToAdmin(res, "connected");
     } catch (caught) { console.error("[AdSense] OAuth callback failed", caught); returnToAdmin(res, "error"); }
   });
