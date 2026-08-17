@@ -28,7 +28,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="container flex h-[74px] items-center justify-between gap-5">
           <Link href="/" className="group flex items-center gap-3 text-foreground">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary font-serif text-xl text-primary-foreground transition-transform duration-200 group-hover:rotate-6">{platformName.slice(0, 1)}</span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 p-1 transition-transform duration-200 group-hover:rotate-6"><img src="/manus-storage/riwayatak-logo_807d8987.png" alt="شعار روايتك بالعربية" className="h-full w-full object-contain" /></span>
             <span>
               <strong className="block font-serif text-xl leading-none">{platformName}</strong>
               <span className="mt-1 block text-[10px] font-semibold tracking-[0.18em]" style={{ color: appearance?.accentColor }}>{tagline}</span>
