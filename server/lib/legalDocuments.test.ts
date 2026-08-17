@@ -13,6 +13,12 @@ describe("legal document settings", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts section content longer than the previous 5000-character limit", () => {
+    const longBody = "نص طويل ".repeat(900);
+    const result = legalDocumentSchema.safeParse({ title: "وثيقة طويلة", intro: "مقدمة طويلة بما يكفي لاجتياز التحقق.", sections: [{ heading: "قسم طويل", body: longBody }] });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a section with an empty heading or short body", () => {
     const result = legalDocumentSchema.safeParse({
       title: "وثيقة",

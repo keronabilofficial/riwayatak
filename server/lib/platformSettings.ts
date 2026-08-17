@@ -45,8 +45,8 @@ export type SocialLink = z.infer<typeof socialLinkSchema>;
 export const DEFAULT_SOCIAL_LINKS: SocialLink[] = [];
 
 export const legalDocumentKeySchema = z.enum(["privacy", "terms", "content", "copyright", "contact"]);
-export const legalSectionSchema = z.object({ heading: z.string().trim().min(2).max(160), body: z.string().trim().min(10).max(5000) });
-export const legalDocumentSchema = z.object({ title: z.string().trim().min(2).max(120), intro: z.string().trim().min(10).max(2000), notice: z.string().trim().max(1200).optional(), sections: z.array(legalSectionSchema).max(30) });
+export const legalSectionSchema = z.object({ heading: z.string().trim().min(2).max(160), body: z.string().trim().min(10) });
+export const legalDocumentSchema = z.object({ title: z.string().trim().min(2).max(120), intro: z.string().trim().min(10), notice: z.string().trim().optional(), sections: z.array(legalSectionSchema).max(30) });
 export const legalDocumentsSchema = z.object({ privacy: legalDocumentSchema.optional(), terms: legalDocumentSchema.optional(), content: legalDocumentSchema.optional(), copyright: legalDocumentSchema.optional(), contact: legalDocumentSchema.optional() });
 export type LegalDocument = z.infer<typeof legalDocumentSchema>;
 export type LegalDocuments = z.infer<typeof legalDocumentsSchema>;
