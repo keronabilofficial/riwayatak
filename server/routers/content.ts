@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, not, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   activityLogs,
@@ -8,6 +8,7 @@ import {
   chapters,
   favorites,
   favoriteRatings,
+  favoriteNotes,
   favoriteLists,
   favoriteListItems,
   novelCategories,
@@ -117,7 +118,38 @@ export const libraryRouter = router({
     const orderBy = input?.sort === "alphabetical" ? asc(novels.title) : desc(favorites.createdAt);
     const userCondition = eq(favorites.userId, ctx.user.id);
     const categoryCondition = input?.categorySlug ? sql`EXISTS (SELECT 1 FROM novel_categories nc INNER JOIN categories c ON c.id = nc.categoryId WHERE nc.novelId = ${novels.id} AND c.slug = ${input.categorySlug})` : undefined;
-    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt, personalRating: favoriteRatings.rating, totalReadingSeconds: readingProgress.totalReadingSeconds }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(favoriteRatings, and(eq(favoriteRatings.novelId, novels.id), eq(favoriteRatings.userId, ctx.user.id))).leftJoin(readingProgress, and(eq(readingProgress.novelId, novels.id), eq(readingProgress.userId, ctx.user.id))).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
+    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt, personalRating: favoriteRatings.rating, personalNote: favoriteNotes.note, totalReadingSeconds: readingProgress.totalReadingSeconds }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(favoriteRatings, and(eq(favoriteRatings.novelId, novels.id), eq(favoriteRatings.userId, ctx.user.id))).leftJoin(favoriteNotes, and(eq(favoriteNotes.novelId, novels.id), eq(favoriteNotes.userId, ctx.user.id))).leftJoin(readingProgress, and(eq(readingProgress.novelId, novels.id), eq(readingProgress.userId, ctx.user.id))).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
+  }),
+  saveFavoriteNote: protectedProcedure.input(z.object({ novelId: z.number().int(), note: z.string().trim().max(2000) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [favorite] = await db.select({ id: favorites.id }).from(favorites).where(and(eq(favorites.userId, ctx.user.id), eq(favorites.novelId, input.novelId))).limit(1);
+    if (!favorite) throw new TRPCError({ code: "NOT_FOUND", message: "احفظ الرواية في المفضلة أولًا قبل كتابة ملاحظة." });
+    if (!input.note) {
+      await db.delete(favoriteNotes).where(and(eq(favoriteNotes.userId, ctx.user.id), eq(favoriteNotes.novelId, input.novelId)));
+    } else {
+      await db.insert(favoriteNotes).values({ userId: ctx.user.id, novelId: input.novelId, note: input.note }).onDuplicateKeyUpdate({ set: { note: input.note, updatedAt: new Date() } });
+    }
+    return { success: true };
+  }),
+  suggestions: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    const favoriteSeeds = await db.select({ novelId: favorites.novelId }).from(favorites).where(eq(favorites.userId, ctx.user.id));
+    const readingSeeds = await db.select({ novelId: readingProgress.novelId }).from(readingProgress).where(eq(readingProgress.userId, ctx.user.id));
+    const seedIds = Array.from(new Set([...favoriteSeeds, ...readingSeeds].map(row => row.novelId)));
+    if (!seedIds.length) return [];
+    const seedCategoryRows = await db.select({ categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, seedIds));
+    const seedTagRows = await db.select({ tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, seedIds));
+    const categoryIds = new Set(seedCategoryRows.map(row => row.categoryId));
+    const tagIds = new Set(seedTagRows.map(row => row.tagId));
+    const candidates = await db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName }).from(novels).innerJoin(authors, eq(novels.authorId, authors.id)).where(not(inArray(novels.id, seedIds))).limit(100);
+    if (!candidates.length) return [];
+    const candidateIds = candidates.map(row => row.novelId);
+    const candidateCategories = await db.select({ novelId: novelCategories.novelId, categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, candidateIds));
+    const candidateTags = await db.select({ novelId: novelTags.novelId, tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, candidateIds));
+    const scores = new Map<number, number>();
+    candidateCategories.forEach(row => { if (categoryIds.has(row.categoryId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 2); });
+    candidateTags.forEach(row => { if (tagIds.has(row.tagId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 1); });
+    return candidates.map(row => ({ ...row, relevanceScore: scores.get(row.novelId) ?? 0 })).filter(row => row.relevanceScore > 0).sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 8);
   }),
   rateFavorite: protectedProcedure.input(z.object({ novelId: z.number().int(), rating: z.number().int().min(1).max(5) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();

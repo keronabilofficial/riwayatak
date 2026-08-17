@@ -99,6 +99,13 @@
       "when": 1786933084299,
       "tag": "0013_striped_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1786933592018,
+      "tag": "0014_sudden_firestar",
+      "breakpoints": true
     }
   ]
 }

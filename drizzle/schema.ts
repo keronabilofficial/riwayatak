@@ -233,6 +233,19 @@ export const favoriteRatings = mysqlTable(
   table => [uniqueIndex("favorite_ratings_user_novel_unique").on(table.userId, table.novelId)]
 );
 
+export const favoriteNotes = mysqlTable(
+  "favorite_notes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    novelId: int("novelId").notNull().references(() => novels.id),
+    note: text("note").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("favorite_notes_user_novel_unique").on(table.userId, table.novelId)]
+);
+
 export const favoriteLists = mysqlTable(
   "favorite_lists",
   {
