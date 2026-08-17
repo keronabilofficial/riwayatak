@@ -1,5 +1,7 @@
 import BookCard from "@/components/BookCard";
 import PublicLayout from "@/components/PublicLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { canAccessManagement } from "@/lib/adminAccess";
 import AdPlacement from "@/components/AdPlacement";
 import SectionHeading from "@/components/SectionHeading";
 import { Button } from "@/components/ui/button";
@@ -11,6 +13,8 @@ import { Link, useLocation } from "wouter";
 
 export default function Home() {
   const { data, isLoading } = trpc.catalog.home.useQuery();
+  const { user } = useAuth();
+  const canManageContent = canAccessManagement(user?.role);
   const { data: appearance } = trpc.platform.appearance.useQuery();
   const [query, setQuery] = useState("");
   const [, navigate] = useLocation();
@@ -47,7 +51,7 @@ export default function Home() {
     </div></section>
 
     <section className="container py-18 md:py-24"><SectionHeading eyebrow="أضيف حديثًا" title="واصل من حيث تبدأ الحكاية" href="/novels" />
-      {latest.length > 0 ? <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">{latest.slice(0, 6).map(novel => <BookCard key={novel.id} novel={novel} featured />)}</div> : <div className="rounded-[1.5rem] bg-[#1d2940] p-9 text-[#f6f1e7]"><p className="text-sm text-[#d5a85e]">إدارة المحتوى المركزية</p><h3 className="mt-2 font-serif text-3xl">ابنِ مكتبتك روايةً وراء رواية.</h3><p className="mt-3 max-w-xl text-sm leading-7 text-[#f6f1e7]/65">أنشئ المؤلفين والروايات والفصول، ثم راجع المحتوى وانشره ضمن دورة عمل واضحة.</p><Link href="/admin"><Button className="mt-6 bg-[#d5a85e] text-[#1d2940] hover:bg-[#ead7ad]">الانتقال إلى الإدارة</Button></Link></div>}
+      {latest.length > 0 ? <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">{latest.slice(0, 6).map(novel => <BookCard key={novel.id} novel={novel} featured />)}</div> : canManageContent ? <div className="rounded-[1.5rem] bg-[#1d2940] p-9 text-[#f6f1e7]"><p className="text-sm text-[#d5a85e]">إدارة المحتوى المركزية</p><h3 className="mt-2 font-serif text-3xl">ابنِ مكتبتك روايةً وراء رواية.</h3><p className="mt-3 max-w-xl text-sm leading-7 text-[#f6f1e7]/65">أنشئ المؤلفين والروايات والفصول، ثم راجع المحتوى وانشره ضمن دورة عمل واضحة.</p><Link href="/admin"><Button className="mt-6 bg-[#d5a85e] text-[#1d2940] hover:bg-[#ead7ad]">الانتقال إلى الإدارة</Button></Link></div> : <div className="rounded-[1.5rem] border border-dashed border-[#af7c42]/40 bg-[#fbf8f2] p-9 text-center"><p className="font-serif text-3xl text-[#1d2940]">ستبدأ الحكايات من هنا.</p><p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#667085]">لا توجد روايات منشورة حاليًا. استكشف المكتبة أو عد لاحقًا لاكتشاف الإصدارات الجديدة.</p><Link href="/novels"><Button className="mt-6 bg-[#af7c42] text-white hover:bg-[#936536]">استكشاف الروايات</Button></Link></div>}
     </section>
   </PublicLayout>;
 }
