@@ -7,12 +7,13 @@ import ChapterComments from "@/components/ChapterComments";
 import { parseReaderFontScale, readerFontScaleKey } from "@/lib/readerPreferences";
 import { ArrowRight, BookmarkPlus, Check, ChevronLeft, ChevronRight, Headphones, List, LockKeyhole, Minus, Moon, Plus, Quote, Settings2, Sun, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; chapterSlug: string }) {
   const { data: chapter, isLoading } = trpc.catalog.read.useQuery({ novelSlug, chapterSlug });
   const { isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [, navigate] = useLocation();
   const dark = theme === "dark";
   const [toc, setToc] = useState(false);
   const [readingSettings, setReadingSettings] = useState(false);
@@ -42,6 +43,28 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
   useEffect(() => {
     window.localStorage.setItem(readerFontScaleKey, String(fontScale));
   }, [fontScale]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
+      if (event.key === "ArrowLeft" && chapter?.next) {
+        event.preventDefault();
+        navigate(`/read/${chapter.novelSlug}/${chapter.next.slug}`);
+      } else if (event.key === "ArrowRight" && chapter?.previous) {
+        event.preventDefault();
+        navigate(`/read/${chapter.novelSlug}/${chapter.previous.slug}`);
+      } else if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        setFontScale(current => Math.min(1.5, Number((current + 0.08).toFixed(2))));
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        setFontScale(current => Math.max(1, Number((current - 0.08).toFixed(2))));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [chapter?.novelSlug, chapter?.next?.slug, chapter?.previous?.slug, navigate]);
 
   useEffect(() => {
     if (!chapter || !chapter.access.allowed || isProgressLoading) return;
