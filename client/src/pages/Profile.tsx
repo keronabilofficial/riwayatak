@@ -53,13 +53,13 @@ export default function Profile() {
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [activitySort, setActivitySort] = useState<ActivitySort>("newest");
   useEffect(() => { if (profile.data) { setName(profile.data.name ?? ""); setBio(profile.data.bio ?? ""); setCountry(profile.data.country ?? ""); setPreferredLanguage(profile.data.preferredLanguage ?? "ar"); } }, [profile.data]);
+  const visibleActivities = useMemo(() => sortActivities(filterActivities(profile.data?.activities ?? [], activityFilter), activitySort), [profile.data, activityFilter, activitySort]);
   if (loading || profile.isLoading || suggestions.isLoading) return <PublicLayout><div className="container grid min-h-[60vh] place-items-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></PublicLayout>;
   if (!user || !profile.data) return null;
   const current = profile.data;
   const counts = countSuggestionStatuses(suggestions.data ?? []);
   const avatar = selectedImage === null ? null : selectedImage ?? current.avatarUrl;
   const completion = profileCompletion({ name: current.name, avatarUrl: current.avatarUrl, bio: current.bio, country: current.country, preferredLanguage: current.preferredLanguage });
-  const visibleActivities = useMemo(() => sortActivities(filterActivities(current.activities, activityFilter), activitySort), [current.activities, activityFilter, activitySort]);
   const handleFile = (file?: File) => { if (!file) return; if (!file.type.match(/^image\/(png|jpeg|webp)$/) || file.size > 5 * 1024 * 1024) return; const reader = new FileReader(); reader.onload = () => { setSelectedImage(String(reader.result)); setRotation(0); }; reader.readAsDataURL(file); };
   const cropAndApply = async () => { if (!selectedImage) return; const cropped = await cropSquare(selectedImage, rotation); setSelectedImage(cropped); setRotation(0); };
   const saveProfile = () => update.mutate({ name: name.trim(), bio: bio.trim() || null, country: country.trim() || null, preferredLanguage, ...(selectedImage !== undefined ? { avatarDataUrl: selectedImage } : {}) });
