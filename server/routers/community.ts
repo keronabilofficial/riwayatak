@@ -21,6 +21,7 @@ import {
 import { getDb } from "../db";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { canAuthorReply } from "../lib/authorReply";
+import { assertModeratedText } from "../lib/moderation";
 
 async function requireDb() {
   const db = await getDb();
@@ -141,6 +142,7 @@ export const communityRouter = router({
     return db.select({ id: chapterComments.id, body: chapterComments.body, createdAt: chapterComments.createdAt, userId: users.id, userName: users.name }).from(chapterComments).innerJoin(users, eq(chapterComments.userId, users.id)).where(and(eq(chapterComments.chapterId, input.chapterId), eq(chapterComments.isHidden, false))).orderBy(desc(chapterComments.createdAt)).limit(100);
   }),
   addComment: protectedProcedure.input(z.object({ chapterId: z.number().int().positive(), body: z.string().trim().min(2).max(1200) })).mutation(async ({ ctx, input }) => {
+    assertModeratedText(input.body, "التعليق");
     const db = await requireDb();
     const [chapter] = await db.select({ id: chapters.id, status: chapters.status }).from(chapters).where(eq(chapters.id, input.chapterId)).limit(1);
     if (!chapter || chapter.status !== "published") throw new Error("لا يمكن التعليق على فصل غير منشور.");
@@ -148,6 +150,7 @@ export const communityRouter = router({
     return { id: created.id };
   }),
   authorReply: editorProcedure.input(z.object({ commentId: z.number().int().positive(), body: z.string().trim().min(2).max(1200) })).mutation(async ({ ctx, input }) => {
+    assertModeratedText(input.body, "رد المؤلف");
     const db = await requireDb();
     const [comment] = await db.select({ commentId: chapterComments.id, chapterId: chapters.id, novelId: novels.id, authorId: novels.authorId, chapterStatus: chapters.status, ownerId: novels.createdByUserId, recipientId: chapterComments.userId, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug }).from(chapterComments).innerJoin(chapters, eq(chapterComments.chapterId, chapters.id)).innerJoin(novels, eq(chapters.novelId, novels.id)).where(eq(chapterComments.id, input.commentId)).limit(1);
     if (!comment || !canAuthorReply({ chapterStatus: comment.chapterStatus, ownerId: comment.ownerId, userId: ctx.user.id })) throw new Error("لا تملك صلاحية الرد على هذا التعليق.");
@@ -161,6 +164,7 @@ export const communityRouter = router({
     return { success: true };
   }),
   reportComment: protectedProcedure.input(z.object({ commentId: z.number().int().positive(), reason: z.string().trim().min(3).max(250) })).mutation(async ({ ctx, input }) => {
+    assertModeratedText(input.reason, "سبب البلاغ");
     const db = await requireDb();
     await db.insert(commentReports).values({ userId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: { reason: input.reason } });
     return { success: true };
