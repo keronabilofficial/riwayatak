@@ -3,6 +3,7 @@ import PublicLayout from "@/components/PublicLayout";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { filterAndSortFavorites } from "@/lib/favoriteFilters";
+import { defaultLibraryPreferences, libraryPreferencesKey, parseLibraryPreferences, type LibraryPreferences } from "@/lib/readerPreferences";
 import { Ban, Bell, BookHeart, BookOpen, Clock3, FileText, Filter, HeartOff, ListPlus, LogIn, Plus, Search, Share2, SlidersHorizontal, Sparkles, Star, Timer, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { startLogin } from "@/const";
@@ -22,15 +23,22 @@ function formatReadingTime(seconds: number | null | undefined) {
   return `${Math.floor(minutes / 60)} ساعة و${minutes % 60} دقيقة`;
 }
 
+function loadLibraryPreferences() {
+  if (typeof window === "undefined") return defaultLibraryPreferences;
+  return parseLibraryPreferences(window.localStorage.getItem(libraryPreferencesKey));
+}
+
 export default function Library() {
+  const [storedPreferences] = useState(loadLibraryPreferences);
+
   const { isAuthenticated, loading } = useAuth();
-  const [favoriteSort, setFavoriteSort] = useState<"recent" | "alphabetical" | "reading_time" | "rating" | "progress">("recent");
-  const [favoriteCategory, setFavoriteCategory] = useState("all");
-  const [favoriteStatus, setFavoriteStatus] = useState<"all" | "not_started" | "in_progress" | "completed">("all");
-  const [favoriteRatingFilter, setFavoriteRatingFilter] = useState<"all" | "rated" | "unrated" | "four_plus">("all");
-  const [favoriteNoteFilter, setFavoriteNoteFilter] = useState<"all" | "with_note" | "without_note">("all");
+  const [favoriteSort, setFavoriteSort] = useState<LibraryPreferences["sort"]>(storedPreferences.sort);
+  const [favoriteCategory, setFavoriteCategory] = useState(storedPreferences.category);
+  const [favoriteStatus, setFavoriteStatus] = useState<LibraryPreferences["status"]>(storedPreferences.status);
+  const [favoriteRatingFilter, setFavoriteRatingFilter] = useState<LibraryPreferences["rating"]>(storedPreferences.rating);
+  const [favoriteNoteFilter, setFavoriteNoteFilter] = useState<LibraryPreferences["note"]>(storedPreferences.note);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
-  const [favoriteSearch, setFavoriteSearch] = useState("");
+  const [favoriteSearch, setFavoriteSearch] = useState(storedPreferences.search);
   const [shareFeedback, setShareFeedback] = useState("");
   const [newListName, setNewListName] = useState("");
   const [listSelections, setListSelections] = useState<Record<number, string>>({});
@@ -59,6 +67,9 @@ export default function Library() {
   const markAllRead = trpc.library.markAllNotificationsRead.useMutation({ onSuccess: () => utils.library.notifications.invalidate() });
   const deleteAllNotifications = trpc.library.deleteAllNotifications.useMutation({ onSuccess: () => utils.library.notifications.invalidate() });
   const unreadCount = notifications?.filter(item => !item.isRead).length ?? 0;
+  useEffect(() => {
+    window.localStorage.setItem(libraryPreferencesKey, JSON.stringify({ sort: favoriteSort, category: favoriteCategory, status: favoriteStatus, rating: favoriteRatingFilter, note: favoriteNoteFilter, search: favoriteSearch } satisfies LibraryPreferences));
+  }, [favoriteSort, favoriteCategory, favoriteStatus, favoriteRatingFilter, favoriteNoteFilter, favoriteSearch]);
   useEffect(() => {
     if (!notifications) return;
     const ids = new Set(notifications.map(item => item.id));
