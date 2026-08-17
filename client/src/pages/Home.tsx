@@ -16,6 +16,7 @@ export default function Home() {
   const { user } = useAuth();
   const canManageContent = canAccessManagement(user?.role);
   const { data: appearance } = trpc.platform.appearance.useQuery();
+  const { data: continueReading } = trpc.library.continueReading.useQuery(undefined, { enabled: Boolean(user) });
   const [query, setQuery] = useState("");
   const [, navigate] = useLocation();
   const featured = data?.featured ?? [];
@@ -35,7 +36,7 @@ export default function Home() {
           <form onSubmit={submitSearch} className="mt-9 flex max-w-lg items-center gap-2 rounded-2xl bg-white p-2 shadow-2xl shadow-black/20">
             <Search className="mr-2 h-5 w-5 text-[#7d8796]" /><Input value={query} onChange={event => setQuery(event.target.value)} placeholder="ابحث عن عنوان أو مؤلف أو وسم..." className="h-11 border-0 bg-transparent text-[#1d2940] shadow-none focus-visible:ring-0" /><Button type="submit" className="h-11 bg-[#af7c42] px-6 text-white hover:bg-[#936536]">بحث</Button>
           </form>
-          <div className="mt-8 flex items-center gap-6 text-sm text-[#f6f1e7]/65"><span className="inline-flex items-center gap-2"><BookOpen className="h-4 w-4 text-[#d5a85e]" />قراءة بلا تشتيت</span><span>واجهة عربية أصيلة</span></div>
+          <div className="mt-8 flex flex-wrap items-center gap-4 text-sm text-[#f6f1e7]/65"><span className="inline-flex items-center gap-2"><BookOpen className="h-4 w-4 text-[#d5a85e]" />قراءة بلا تشتيت</span><span>واجهة عربية أصيلة</span>{continueReading?.[0] ? <Link href={`/read/${continueReading[0].novelSlug}/${continueReading[0].chapterSlug}`} className="inline-flex items-center gap-2 rounded-xl bg-[#d5a85e] px-4 py-2 font-bold text-[#1d2940] transition hover:bg-[#ead7ad]"><BookOpen className="h-4 w-4" />متابعة القراءة<span className="text-xs font-normal opacity-75">{continueReading[0].novelTitle} · {continueReading[0].progressPercent}%</span></Link> : null}</div>
         </div>
       </div>
     </section>
