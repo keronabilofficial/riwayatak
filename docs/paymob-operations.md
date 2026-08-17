@@ -21,3 +21,19 @@
 تأكد من أن مفاتيح الإنتاج ومعرّف التكامل وHMAC كلها من البيئة نفسها، ومن أن عنوان الويبهوك أعلاه متاح علنًا عبر نطاق المنصة. راقب أول عملية ناجحة من لوحة Paymob ثم من صفحة الباقات في المنصة، وتحقق من ظهور اشتراك نشط قبل السماح للقارئ باستهلاك محتوى مدفوع.
 
 المصدر التقني: [Paymob — Create Intention](https://developers.paymob.com/paymob-docs/developers/intention-apis/create-intention)، [Unified Checkout](https://developers.paymob.com/paymob-docs/developers/checkout-experiences/unified-checkout-redirection)، و[HMAC Transaction Callback](https://developers.paymob.com/paymob-docs/developers/webhook-callbacks-and-hmac/hmac/hmac-transaction-callback).
+
+## إدارة الباقات وتجميد الاشتراك
+
+تُقرأ أسعار الباقات وحدودها من إعدادات مدير النظام، لكن عند إنشاء دورة اشتراك تُحفظ **لقطة مستقلة** للسعر والحدود والمدة. لذلك لا يغيّر تعديل الباقة من لوحة الإدارة دورة نشطة بدأت مسبقًا؛ يسري التعديل على الدورات الجديدة فقط.
+
+## تشخيص بيئة الاختبار
+
+إذا رفض Paymob معرّف التكامل رغم ظهوره في لوحة الحساب، تحقّق أولًا من تطابق العملة والقناة ونوع التكامل وبيئة الاختبار، ثم أعد المحاولة بطريقة الدفع `card` التي يدعمها مسار Checkout الحالي. لا تُعدّل معرفات الدورة أو تمنح وصولًا يدويًا عند فشل Checkout؛ يلزم انتظار مراجعة الحساب أو تأكيد Paymob أن تكامل VPC متاح للحساب.
+
+## دليل التشغيل الفعلي
+
+قبل اختبار الدفع الحي، يجب أن يكون الحساب قد خرج من المراجعة، وأن تُستخدم مفاتيح الإنتاج من البيئة نفسها، وأن تُجرى عملية ناجحة ثم يُراجع وصولها إلى الويبهوك وتفعيل الدورة في المنصة. لا يمكن اعتبار الاختبار مكتملًا اعتمادًا على فحص محلي أو على إنشاء بيانات دفع مصطنعة.
+
+> ملاحظة الخصوصية: لا تسجل المنصة أرقام البطاقات أو رموزها، ولا ينبغي وضع أي مفتاح Paymob في مستودع Git أو في كود الواجهة.
+
+المراجع الرسمية: [Paymob — Create Intention](https://developers.paymob.com/paymob-docs/developers/intention-apis/create-intention)، [Unified Checkout](https://developers.paymob.com/paymob-docs/developers/checkout-experiences/unified-checkout-redirection)، و[HMAC Transaction Callback](https://developers.paymob.com/paymob-docs/developers/webhook-callbacks-and-hmac/hmac/hmac-transaction-callback).
