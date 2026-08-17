@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getPaymobConfiguration, validatePaymobCredentials } from "./paymob";
 
 describe("بيانات اعتماد Paymob", () => {
@@ -10,9 +10,14 @@ describe("بيانات اعتماد Paymob", () => {
     expect(config.cardIntegrationId).toBeGreaterThan(0);
   });
 
-  it("يقبل Paymob المفتاح السري عند طلب تحقق لا ينشئ نية دفع", async () => {
-    const result = await validatePaymobCredentials();
-    expect(result.authenticated).toBe(true);
-    expect([400, 422]).toContain(result.status);
-  }, 15_000);
+  it("يقبل Paymob المفتاح السري عند استجابة تحقق غير منشئة لنية دفع", async () => {
+    const request = vi.fn(async (_url: string, options?: RequestInit) => {
+      expect(options?.method).toBe("POST");
+      expect((options?.headers as Record<string, string>).Authorization).toMatch(/^Token /);
+      return new Response(JSON.stringify({ detail: "validation request has no payment data" }), { status: 422 });
+    });
+    const result = await validatePaymobCredentials(request);
+    expect(result).toEqual({ authenticated: true, status: 422 });
+    expect(request).toHaveBeenCalledOnce();
+  });
 });
