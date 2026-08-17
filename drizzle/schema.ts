@@ -233,6 +233,29 @@ export const favoriteRatings = mysqlTable(
   table => [uniqueIndex("favorite_ratings_user_novel_unique").on(table.userId, table.novelId)]
 );
 
+export const favoriteLists = mysqlTable(
+  "favorite_lists",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("favorite_lists_user_name_unique").on(table.userId, table.name)]
+);
+
+export const favoriteListItems = mysqlTable(
+  "favorite_list_items",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    listId: int("listId").notNull().references(() => favoriteLists.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("favorite_list_items_list_novel_unique").on(table.listId, table.novelId)]
+);
+
 export const novelFollows = mysqlTable(
   "novel_follows",
   {
@@ -254,6 +277,7 @@ export const readingProgress = mysqlTable(
     characterOffset: int("characterOffset").default(0).notNull(),
     progressPercent: int("progressPercent").default(0).notNull(),
     isCompleted: boolean("isCompleted").default(false).notNull(),
+    totalReadingSeconds: int("totalReadingSeconds").default(0).notNull(),
     lastReadAt: timestamp("lastReadAt").defaultNow().notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

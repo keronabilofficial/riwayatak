@@ -15,6 +15,7 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const recordView = trpc.catalog.recordView.useMutation();
   const saveProgress = trpc.library.saveProgress.useMutation();
+  const recordReadingTime = trpc.library.recordReadingTime.useMutation();
   const listenChapter = trpc.subscriptions.listenChapter.useMutation({ onSuccess: result => setAudioUrl(result.audioUrl) });
 
   useEffect(() => {
@@ -22,6 +23,17 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
     recordView.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, eventType: "chapter_open" });
     if (isAuthenticated) saveProgress.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, characterOffset: 0, progressPercent: 0, isCompleted: false });
   }, [chapter?.chapterId, chapter?.novelId, isAuthenticated]);
+
+  useEffect(() => {
+    if (!chapter || !chapter.access.allowed || !isAuthenticated) return;
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => recordReadingTime.mutate({ novelId: chapter.novelId, seconds: 30 }), 30000);
+    return () => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      if (elapsed >= 5) recordReadingTime.mutate({ novelId: chapter.novelId, seconds: Math.min(300, elapsed) });
+      window.clearInterval(interval);
+    };
+  }, [chapter?.chapterId, chapter?.novelId, chapter?.access.allowed, isAuthenticated]);
 
   if (isLoading) return <div className="grid min-h-screen place-items-center bg-background"><div className="h-96 w-80 animate-pulse rounded-3xl bg-muted" /></div>;
   if (!chapter) return <div className="grid min-h-screen place-items-center bg-background text-foreground text-center" dir="rtl"><div><h1 className="font-serif text-4xl">الفصل غير متاح</h1><Link href="/novels" className="mt-4 inline-block text-[#af7c42]">العودة للمكتبة</Link></div></div>;

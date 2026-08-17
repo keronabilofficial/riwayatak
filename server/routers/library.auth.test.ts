@@ -16,4 +16,10 @@ describe("صلاحيات مكتبة العضو", () => {
   it("يرفض التقييم الشخصي من غير المسجل", async () => {
     await expect(caller.rateFavorite({ novelId: 1, rating: 5 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
+
+  it("يرفض القوائم المخصصة وزمن القراءة من غير المسجل", async () => {
+    await expect(caller.favoriteLists()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.createFavoriteList({ name: "قائمة" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.recordReadingTime({ novelId: 1, seconds: 30 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 });
