@@ -85,6 +85,13 @@
       "when": 1786747593122,
       "tag": "0011_quick_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1786932461531,
+      "tag": "0012_fearless_johnny_storm",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   categories,
   chapters,
   favorites,
+  favoriteRatings,
   novelCategories,
   novelFollows,
   novelReviews,
@@ -112,7 +113,14 @@ export const libraryRouter = router({
     const orderBy = input?.sort === "alphabetical" ? asc(novels.title) : desc(favorites.createdAt);
     const userCondition = eq(favorites.userId, ctx.user.id);
     const categoryCondition = input?.categorySlug ? sql`EXISTS (SELECT 1 FROM novel_categories nc INNER JOIN categories c ON c.id = nc.categoryId WHERE nc.novelId = ${novels.id} AND c.slug = ${input.categorySlug})` : undefined;
-    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
+    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt, personalRating: favoriteRatings.rating }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(favoriteRatings, and(eq(favoriteRatings.novelId, novels.id), eq(favoriteRatings.userId, ctx.user.id))).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
+  }),
+  rateFavorite: protectedProcedure.input(z.object({ novelId: z.number().int(), rating: z.number().int().min(1).max(5) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [favorite] = await db.select({ id: favorites.id }).from(favorites).where(and(eq(favorites.userId, ctx.user.id), eq(favorites.novelId, input.novelId))).limit(1);
+    if (!favorite) throw new TRPCError({ code: "NOT_FOUND", message: "احفظ الرواية في المفضلة أولًا قبل تقييمها." });
+    await db.insert(favoriteRatings).values({ userId: ctx.user.id, novelId: input.novelId, rating: input.rating }).onDuplicateKeyUpdate({ set: { rating: input.rating, updatedAt: new Date() } });
+    return { success: true, rating: input.rating };
   }),
   markAllNotificationsRead: protectedProcedure.mutation(async ({ ctx }) => {
     const db = await requireDb();
