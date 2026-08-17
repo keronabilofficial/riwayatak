@@ -22,4 +22,10 @@ describe("صلاحيات مكتبة العضو", () => {
     await expect(caller.createFavoriteList({ name: "قائمة" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.recordReadingTime({ novelId: 1, seconds: 30 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
+
+  it("يرفض نشر أو إلغاء نشر الملاحظة وإخفاء الاقتراح من غير المسجل", async () => {
+    await expect(caller.publishFavoriteNote({ novelId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.unpublishFavoriteNote({ novelId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.dismissSuggestion({ novelId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 });

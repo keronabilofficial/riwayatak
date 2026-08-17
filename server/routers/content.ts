@@ -9,6 +9,7 @@ import {
   favorites,
   favoriteRatings,
   favoriteNotes,
+  recommendationDismissals,
   favoriteLists,
   favoriteListItems,
   novelCategories,
@@ -118,7 +119,7 @@ export const libraryRouter = router({
     const orderBy = input?.sort === "alphabetical" ? asc(novels.title) : desc(favorites.createdAt);
     const userCondition = eq(favorites.userId, ctx.user.id);
     const categoryCondition = input?.categorySlug ? sql`EXISTS (SELECT 1 FROM novel_categories nc INNER JOIN categories c ON c.id = nc.categoryId WHERE nc.novelId = ${novels.id} AND c.slug = ${input.categorySlug})` : undefined;
-    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt, personalRating: favoriteRatings.rating, personalNote: favoriteNotes.note, totalReadingSeconds: readingProgress.totalReadingSeconds }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(favoriteRatings, and(eq(favoriteRatings.novelId, novels.id), eq(favoriteRatings.userId, ctx.user.id))).leftJoin(favoriteNotes, and(eq(favoriteNotes.novelId, novels.id), eq(favoriteNotes.userId, ctx.user.id))).leftJoin(readingProgress, and(eq(readingProgress.novelId, novels.id), eq(readingProgress.userId, ctx.user.id))).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
+    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt, personalRating: favoriteRatings.rating, personalNote: favoriteNotes.note, personalNotePublished: favoriteNotes.isPublished, totalReadingSeconds: readingProgress.totalReadingSeconds }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(favoriteRatings, and(eq(favoriteRatings.novelId, novels.id), eq(favoriteRatings.userId, ctx.user.id))).leftJoin(favoriteNotes, and(eq(favoriteNotes.novelId, novels.id), eq(favoriteNotes.userId, ctx.user.id))).leftJoin(readingProgress, and(eq(readingProgress.novelId, novels.id), eq(readingProgress.userId, ctx.user.id))).where(categoryCondition ? and(userCondition, categoryCondition) : userCondition).orderBy(orderBy).limit(24);
   }),
   saveFavoriteNote: protectedProcedure.input(z.object({ novelId: z.number().int(), note: z.string().trim().max(2000) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
@@ -137,11 +138,13 @@ export const libraryRouter = router({
     const readingSeeds = await db.select({ novelId: readingProgress.novelId }).from(readingProgress).where(eq(readingProgress.userId, ctx.user.id));
     const seedIds = Array.from(new Set([...favoriteSeeds, ...readingSeeds].map(row => row.novelId)));
     if (!seedIds.length) return [];
+    const dismissedRows = await db.select({ novelId: recommendationDismissals.novelId }).from(recommendationDismissals).where(eq(recommendationDismissals.userId, ctx.user.id));
+    const dismissedIds = dismissedRows.map(row => row.novelId);
     const seedCategoryRows = await db.select({ categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, seedIds));
     const seedTagRows = await db.select({ tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, seedIds));
     const categoryIds = new Set(seedCategoryRows.map(row => row.categoryId));
     const tagIds = new Set(seedTagRows.map(row => row.tagId));
-    const candidates = await db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName }).from(novels).innerJoin(authors, eq(novels.authorId, authors.id)).where(not(inArray(novels.id, seedIds))).limit(100);
+    const candidates = await db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName }).from(novels).innerJoin(authors, eq(novels.authorId, authors.id)).where(not(inArray(novels.id, [...seedIds, ...dismissedIds]))).limit(100);
     if (!candidates.length) return [];
     const candidateIds = candidates.map(row => row.novelId);
     const candidateCategories = await db.select({ novelId: novelCategories.novelId, categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, candidateIds));
@@ -150,6 +153,30 @@ export const libraryRouter = router({
     candidateCategories.forEach(row => { if (categoryIds.has(row.categoryId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 2); });
     candidateTags.forEach(row => { if (tagIds.has(row.tagId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 1); });
     return candidates.map(row => ({ ...row, relevanceScore: scores.get(row.novelId) ?? 0 })).filter(row => row.relevanceScore > 0).sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 8);
+  }),
+  publishFavoriteNote: protectedProcedure.input(z.object({ novelId: z.number().int(), rating: z.number().int().min(1).max(5).optional() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [note] = await db.select({ note: favoriteNotes.note }).from(favoriteNotes).where(and(eq(favoriteNotes.userId, ctx.user.id), eq(favoriteNotes.novelId, input.novelId))).limit(1);
+    const [favorite] = await db.select({ id: favorites.id }).from(favorites).where(and(eq(favorites.userId, ctx.user.id), eq(favorites.novelId, input.novelId))).limit(1);
+    const [savedRating] = await db.select({ rating: favoriteRatings.rating }).from(favoriteRatings).where(and(eq(favoriteRatings.userId, ctx.user.id), eq(favoriteRatings.novelId, input.novelId))).limit(1);
+    if (!note || !favorite) throw new TRPCError({ code: "NOT_FOUND", message: "اكتب ملاحظة لرواية محفوظة في المفضلة أولًا." });
+    const rating = input.rating ?? savedRating?.rating;
+    if (!rating) throw new TRPCError({ code: "BAD_REQUEST", message: "اختر تقييمًا بالنجوم قبل نشر الملاحظة كمراجعة." });
+    const body = note.note.replace(/\\*\\*(.*?)\\*\\*/g, "$1").replace(/^[-*] /gm, "• ");
+    await db.insert(novelReviews).values({ novelId: input.novelId, userId: ctx.user.id, rating, body }).onDuplicateKeyUpdate({ set: { rating, body, updatedAt: new Date() } });
+    await db.update(favoriteNotes).set({ isPublished: true }).where(and(eq(favoriteNotes.userId, ctx.user.id), eq(favoriteNotes.novelId, input.novelId)));
+    return { success: true };
+  }),
+  unpublishFavoriteNote: protectedProcedure.input(z.object({ novelId: z.number().int() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.delete(novelReviews).where(and(eq(novelReviews.userId, ctx.user.id), eq(novelReviews.novelId, input.novelId)));
+    await db.update(favoriteNotes).set({ isPublished: false }).where(and(eq(favoriteNotes.userId, ctx.user.id), eq(favoriteNotes.novelId, input.novelId)));
+    return { success: true };
+  }),
+  dismissSuggestion: protectedProcedure.input(z.object({ novelId: z.number().int() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.insert(recommendationDismissals).values({ userId: ctx.user.id, novelId: input.novelId }).onDuplicateKeyUpdate({ set: { novelId: input.novelId } });
+    return { success: true };
   }),
   rateFavorite: protectedProcedure.input(z.object({ novelId: z.number().int(), rating: z.number().int().min(1).max(5) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
