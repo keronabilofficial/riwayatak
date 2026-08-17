@@ -459,6 +459,8 @@ export const notifications = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull().references(() => users.id),
+    novelId: int("novelId").references(() => novels.id, { onDelete: "set null" }),
+    authorId: int("authorId").references(() => authors.id, { onDelete: "set null" }),
     type: mysqlEnum("type", ["new_chapter", "new_novel", "system"]).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     body: text("body").notNull(),
@@ -466,7 +468,7 @@ export const notifications = mysqlTable(
     isRead: boolean("isRead").default(false).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  table => [index("notifications_inbox_idx").on(table.userId, table.isRead, table.createdAt)]
+  table => [index("notifications_inbox_idx").on(table.userId, table.isRead, table.createdAt), index("notifications_novel_idx").on(table.novelId), index("notifications_author_idx").on(table.authorId)]
 );
 
 export const adSlots = mysqlTable("ad_slots", {

@@ -149,10 +149,10 @@ export const communityRouter = router({
   }),
   authorReply: editorProcedure.input(z.object({ commentId: z.number().int().positive(), body: z.string().trim().min(2).max(1200) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
-    const [comment] = await db.select({ commentId: chapterComments.id, chapterId: chapters.id, chapterStatus: chapters.status, ownerId: novels.createdByUserId, recipientId: chapterComments.userId, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug }).from(chapterComments).innerJoin(chapters, eq(chapterComments.chapterId, chapters.id)).innerJoin(novels, eq(chapters.novelId, novels.id)).where(eq(chapterComments.id, input.commentId)).limit(1);
+    const [comment] = await db.select({ commentId: chapterComments.id, chapterId: chapters.id, novelId: novels.id, authorId: novels.authorId, chapterStatus: chapters.status, ownerId: novels.createdByUserId, recipientId: chapterComments.userId, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug }).from(chapterComments).innerJoin(chapters, eq(chapterComments.chapterId, chapters.id)).innerJoin(novels, eq(chapters.novelId, novels.id)).where(eq(chapterComments.id, input.commentId)).limit(1);
     if (!comment || !canAuthorReply({ chapterStatus: comment.chapterStatus, ownerId: comment.ownerId, userId: ctx.user.id })) throw new Error("لا تملك صلاحية الرد على هذا التعليق.");
     const [created] = await db.insert(chapterComments).values({ chapterId: comment.chapterId, userId: ctx.user.id, body: `رد المؤلف: ${input.body}` }).$returningId();
-    if (comment.recipientId !== ctx.user.id) await db.insert(notifications).values({ userId: comment.recipientId, type: "system", title: "رد المؤلف على تعليقك", body: `رد مؤلف رواية «${comment.novelTitle}» على تعليقك.`, href: `/read/${comment.novelSlug}/${comment.chapterSlug}` });
+    if (comment.recipientId !== ctx.user.id) await db.insert(notifications).values({ userId: comment.recipientId, novelId: comment.novelId, authorId: comment.authorId, type: "system", title: "رد المؤلف على تعليقك", body: `رد مؤلف رواية «${comment.novelTitle}» على تعليقك.`, href: `/read/${comment.novelSlug}/${comment.chapterSlug}` });
     return { id: created.id };
   }),
   deleteComment: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

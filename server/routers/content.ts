@@ -56,7 +56,7 @@ async function logActivity(actorUserId: number, action: string, entityType: stri
 async function notifyChapterFollowers(novelId: number, chapterId: number, chapterTitle: string) {
   const db = await getDb();
   if (!db) return;
-  const [novel] = await db.select({ title: novels.title, slug: novels.slug }).from(novels).where(eq(novels.id, novelId)).limit(1);
+  const [novel] = await db.select({ id: novels.id, authorId: novels.authorId, title: novels.title, slug: novels.slug }).from(novels).where(eq(novels.id, novelId)).limit(1);
   if (!novel) return;
   const [chapter] = await db.select({ slug: chapters.slug }).from(chapters).where(eq(chapters.id, chapterId)).limit(1);
   if (!chapter) return;
@@ -68,7 +68,7 @@ async function notifyChapterFollowers(novelId: number, chapterId: number, chapte
   const enabledByUser = new Map(preferences.map(item => [item.userId, item.enabled]));
   const optedInRecipients = recipientIds.filter(userId => enabledByUser.get(userId) !== false);
   if (!optedInRecipients.length) return;
-  await db.insert(notifications).values(optedInRecipients.map(userId => ({ userId, type: "new_chapter" as const, title: `فصل جديد من «${novel.title}»`, body: `نُشر فصل «${chapterTitle}» لرواية محفوظة لديك. يمكنك متابعته الآن.`, href: `/read/${novel.slug}/${chapter.slug}` })));
+  await db.insert(notifications).values(optedInRecipients.map(userId => ({ userId, novelId: novel.id, authorId: novel.authorId, type: "new_chapter" as const, title: `فصل جديد من «${novel.title}»`, body: `نُشر فصل «${chapterTitle}» لرواية محفوظة لديك. يمكنك متابعته الآن.`, href: `/read/${novel.slug}/${chapter.slug}` })));
 }
 
 async function notifyAuthorFollowers(authorId: number, title: string, body: string, href: string) {
@@ -76,7 +76,7 @@ async function notifyAuthorFollowers(authorId: number, title: string, body: stri
   if (!db) return;
   const followers = await db.select({ userId: authorFollows.userId }).from(authorFollows).where(eq(authorFollows.authorId, authorId));
   if (!followers.length) return;
-  await db.insert(notifications).values(followers.map(({ userId }) => ({ userId, type: "new_novel" as const, title, body, href })));
+  await db.insert(notifications).values(followers.map(({ userId }) => ({ userId, authorId, type: "new_novel" as const, title, body, href })));
 }
 
 export const catalogRouter = router({
@@ -271,7 +271,7 @@ export const libraryRouter = router({
   }),
   notifications: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
-    return db.select().from(notifications).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(50);
+    return db.select({ id: notifications.id, userId: notifications.userId, novelId: notifications.novelId, authorId: notifications.authorId, type: notifications.type, title: notifications.title, body: notifications.body, href: notifications.href, isRead: notifications.isRead, createdAt: notifications.createdAt, novelTitle: novels.title, authorName: authors.displayName }).from(notifications).leftJoin(novels, eq(notifications.novelId, novels.id)).leftJoin(authors, eq(notifications.authorId, authors.id)).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(50);
   }),
   notificationSettings: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
