@@ -12,6 +12,7 @@ import Home from "./pages/Home";
 import Legal from "./pages/Legal";
 import Library from "./pages/Library";
 import Profile from "./pages/Profile";
+import Rewards from "./pages/Rewards";
 import NovelDetail from "./pages/NovelDetail";
 import Novels from "./pages/Novels";
 import Reader from "./pages/Reader";
@@ -64,6 +65,7 @@ function Router() {
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
       <Route path={"/profile"} component={Profile} />
+      <Route path={"/rewards"} component={Rewards} />
       <Route path={"/community"} component={CommunityHub} />
       <Route path={"/lists"} component={PublicReadingLists} />
       <Route path={"/lists/:id"}>{params => <PublicReadingListDetail id={params.id} />}</Route>

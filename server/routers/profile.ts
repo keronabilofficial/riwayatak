@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { chapterComments, chapterTranslationSuggestions, chapters, favorites, novelReviews, novels, readingProgress, userPointRedemptions, userPointTransactions, users } from "../../drizzle/schema";
+import { chapterComments, chapterTranslationSuggestions, chapters, favorites, novelReviews, novels, notifications, readingProgress, userPointRedemptions, userPointTransactions, users } from "../../drizzle/schema";
 import { getPointStoreItem, pointStoreItems } from "../lib/pointsStore";
 import { getDb } from "../db";
 import { storagePut } from "../storage";
@@ -43,6 +43,11 @@ export const profileRouter = router({
     const points = Math.max(0, earnedPoints - redeemedPoints);
     return { ...user, activities, points, profileCompletion: { completed: [user.name, user.avatarUrl, user.bio, user.country, user.preferredLanguage].filter(Boolean).length, total: 5 }, pointsUses: ["فتح شارات إنجاز جديدة", "الحصول على أولوية في مراجعة اقتراحات الترجمة", "استبدالها بمزايا قراءة أو محتوى حصري من متجر النقاط"], pointStore: pointStoreItems, redeemedRewardKeys: redemptions.map(item => item.rewardKey), source: "محسوب من التفاعلات الفعلية" as const };
   }),
+  myRewards: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    const rows = await db.select({ rewardKey: userPointRedemptions.rewardKey, pointsCost: userPointRedemptions.pointsCost, redeemedAt: userPointRedemptions.redeemedAt }).from(userPointRedemptions).where(eq(userPointRedemptions.userId, ctx.user.id)).orderBy(desc(userPointRedemptions.redeemedAt));
+    return rows.map(row => ({ ...row, reward: getPointStoreItem(row.rewardKey) }));
+  }),
   redeem: protectedProcedure.input(z.object({ rewardKey: z.enum(["reader_badge", "golden_bookmark", "early_access", "exclusive_audio"]) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const reward = getPointStoreItem(input.rewardKey);
@@ -65,6 +70,7 @@ export const profileRouter = router({
     await db.transaction(async tx => {
       await tx.insert(userPointRedemptions).values({ userId: ctx.user.id, rewardKey: reward.key, pointsCost: reward.cost });
       await tx.insert(userPointTransactions).values({ userId: ctx.user.id, type: "redemption", points: -reward.cost, description: `استبدال ${reward.title}`, entityType: "point_reward", entityId: null });
+      await tx.insert(notifications).values({ userId: ctx.user.id, type: "system", title: "تم استبدال مكافأتك بنجاح", body: `حصلت على «${reward.title}» مقابل ${reward.cost} نقطة.`, href: "/rewards" });
     });
     return { success: true, rewardKey: reward.key, pointsCost: reward.cost, remainingPoints: balance - reward.cost };
   }),

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Activity, BadgeCheck, Crop, Gift, Loader2, RotateCcw, RotateCw, Save, SlidersHorizontal, Sparkles, Star, Trophy, Upload, UserCircle, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { countSuggestionStatuses, translationSuggestionLabels } from "@/lib/translationSuggestionStatus";
 import { filterActivities, getInitials, profileCompletion, sortActivities, type ActivityFilter, type ActivitySort } from "@/lib/activityFilters";
 
@@ -41,7 +42,7 @@ export default function Profile() {
   const profile = trpc.profile.me.useQuery(undefined, { enabled: Boolean(user) });
   const suggestions = trpc.language.myTranslationSuggestions.useQuery(undefined, { enabled: Boolean(user) });
   const update = trpc.profile.update.useMutation({ onSuccess: () => { setSelectedImage(undefined); setRotation(0); void profile.refetch(); } });
-  const redeem = trpc.profile.redeem.useMutation({ onSuccess: () => void profile.refetch() });
+  const redeem = trpc.profile.redeem.useMutation({ onSuccess: result => { toast.success(`تم استبدال المكافأة بنجاح. تبقى لديك ${result.remainingPoints} نقطة.`); void profile.refetch(); }, onError: error => toast.error(error.message || "تعذر استبدال النقاط.") });
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
