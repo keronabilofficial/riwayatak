@@ -345,6 +345,27 @@ export const readingEvents = mysqlTable(
   ]
 );
 
+export const userNotificationPreferences = mysqlTable(
+  "user_notification_preferences",
+  {
+    userId: int("userId").notNull().primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    popupEnabled: boolean("popupEnabled").default(true).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  }
+);
+
+export const novelNotificationPreferences = mysqlTable(
+  "novel_notification_preferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").default(true).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("novel_notification_preferences_user_novel_unique").on(table.userId, table.novelId), index("novel_notification_preferences_user_idx").on(table.userId, table.enabled)]
+);
+
 export const notifications = mysqlTable(
   "notifications",
   {

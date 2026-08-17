@@ -19,6 +19,8 @@ import {
   novelTags,
   novels,
   notifications,
+  userNotificationPreferences,
+  novelNotificationPreferences,
   readingEvents,
   readingProgress,
   tags,
@@ -60,7 +62,11 @@ async function notifyChapterFollowers(novelId: number, chapterId: number, chapte
   const favoriteReaders = await db.select({ userId: favorites.userId }).from(favorites).where(eq(favorites.novelId, novelId));
   const recipientIds = Array.from(new Set([...followers.map(item => item.userId), ...favoriteReaders.map(item => item.userId)]));
   if (!recipientIds.length) return;
-  await db.insert(notifications).values(recipientIds.map(userId => ({ userId, type: "new_chapter" as const, title: `فصل جديد من «${novel.title}»`, body: `نُشر فصل «${chapterTitle}» لرواية محفوظة لديك. يمكنك متابعته الآن.`, href: `/read/${novel.slug}/${chapter.slug}` })));
+  const preferences = await db.select({ userId: novelNotificationPreferences.userId, enabled: novelNotificationPreferences.enabled }).from(novelNotificationPreferences).where(and(eq(novelNotificationPreferences.novelId, novelId), inArray(novelNotificationPreferences.userId, recipientIds)));
+  const enabledByUser = new Map(preferences.map(item => [item.userId, item.enabled]));
+  const optedInRecipients = recipientIds.filter(userId => enabledByUser.get(userId) !== false);
+  if (!optedInRecipients.length) return;
+  await db.insert(notifications).values(optedInRecipients.map(userId => ({ userId, type: "new_chapter" as const, title: `فصل جديد من «${novel.title}»`, body: `نُشر فصل «${chapterTitle}» لرواية محفوظة لديك. يمكنك متابعته الآن.`, href: `/read/${novel.slug}/${chapter.slug}` })));
 }
 
 export const catalogRouter = router({
@@ -250,7 +256,25 @@ export const libraryRouter = router({
   }),
   notifications: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
-    return db.select().from(notifications).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(30);
+    return db.select().from(notifications).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(50);
+  }),
+  notificationSettings: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    const [global] = await db.select({ popupEnabled: userNotificationPreferences.popupEnabled }).from(userNotificationPreferences).where(eq(userNotificationPreferences.userId, ctx.user.id)).limit(1);
+    const rows = await db.select({ novelId: favorites.novelId, title: novels.title, enabled: novelNotificationPreferences.enabled }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).leftJoin(novelNotificationPreferences, and(eq(novelNotificationPreferences.userId, ctx.user.id), eq(novelNotificationPreferences.novelId, favorites.novelId))).where(eq(favorites.userId, ctx.user.id)).orderBy(asc(novels.title));
+    return { popupEnabled: global?.popupEnabled ?? true, novels: rows.map(row => ({ novelId: row.novelId, title: row.title, enabled: row.enabled ?? true })) };
+  }),
+  setPopupNotifications: protectedProcedure.input(z.object({ enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.insert(userNotificationPreferences).values({ userId: ctx.user.id, popupEnabled: input.enabled }).onDuplicateKeyUpdate({ set: { popupEnabled: input.enabled, updatedAt: new Date() } });
+    return { popupEnabled: input.enabled };
+  }),
+  setNovelNotifications: protectedProcedure.input(z.object({ novelId: z.number().int().positive(), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [favorite] = await db.select({ id: favorites.id }).from(favorites).where(and(eq(favorites.userId, ctx.user.id), eq(favorites.novelId, input.novelId))).limit(1);
+    if (!favorite) throw new TRPCError({ code: "NOT_FOUND", message: "يمكن تخصيص تنبيهات روايات مكتبتك فقط." });
+    await db.insert(novelNotificationPreferences).values({ userId: ctx.user.id, novelId: input.novelId, enabled: input.enabled }).onDuplicateKeyUpdate({ set: { enabled: input.enabled, updatedAt: new Date() } });
+    return { novelId: input.novelId, enabled: input.enabled };
   }),
   markNotificationRead: protectedProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
