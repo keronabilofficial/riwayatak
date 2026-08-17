@@ -107,9 +107,20 @@ export const libraryRouter = router({
     const db = await requireDb();
     return db.select({ novelId: readingProgress.novelId, chapterId: readingProgress.chapterId, progressPercent: readingProgress.progressPercent, lastReadAt: readingProgress.lastReadAt, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug, chapterTitle: chapters.title }).from(readingProgress).innerJoin(novels, eq(readingProgress.novelId, novels.id)).innerJoin(chapters, eq(readingProgress.chapterId, chapters.id)).where(eq(readingProgress.userId, ctx.user.id)).orderBy(desc(readingProgress.lastReadAt)).limit(12);
   }),
-  favorites: protectedProcedure.query(async ({ ctx }) => {
+  favorites: protectedProcedure.input(z.object({ sort: z.enum(["recent", "alphabetical"]).default("recent") }).optional()).query(async ({ ctx, input }) => {
     const db = await requireDb();
-    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).where(eq(favorites.userId, ctx.user.id)).orderBy(desc(favorites.createdAt)).limit(24);
+    const orderBy = input?.sort === "alphabetical" ? asc(novels.title) : desc(favorites.createdAt);
+    return db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName, authorSlug: authors.slug, chapterCount: novels.chapterCount, favoritedAt: favorites.createdAt }).from(favorites).innerJoin(novels, eq(favorites.novelId, novels.id)).innerJoin(authors, eq(novels.authorId, authors.id)).where(eq(favorites.userId, ctx.user.id)).orderBy(orderBy).limit(24);
+  }),
+  markAllNotificationsRead: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await requireDb();
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, ctx.user.id));
+    return { success: true };
+  }),
+  deleteAllNotifications: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await requireDb();
+    await db.delete(notifications).where(eq(notifications.userId, ctx.user.id));
+    return { success: true };
   }),
   notifications: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
