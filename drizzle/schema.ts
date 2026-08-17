@@ -17,6 +17,7 @@ export const subscriptionPlanName = ["go", "plus", "ultra", "enterprise"] as con
 export const subscriptionBillingTerm = ["monthly", "quarterly", "hundred_days", "six_months", "yearly"] as const;
 export const subscriptionStatus = ["pending", "active", "past_due", "cancelled", "expired"] as const;
 export const subscriptionCycleStatus = ["pending", "active", "expired", "failed"] as const;
+export const narrativeStatus = ["ongoing", "completed"] as const;
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -105,6 +106,7 @@ export const novels = mysqlTable(
     normalizedTitle: varchar("normalizedTitle", { length: 300 }).notNull(),
     coverMediaId: int("coverMediaId").references(() => media.id),
     status: mysqlEnum("status", publicationStatus).default("draft").notNull(),
+    narrativeStatus: mysqlEnum("narrativeStatus", narrativeStatus).default("ongoing").notNull(),
     isFeatured: boolean("isFeatured").default(false).notNull(),
     chapterCount: int("chapterCount").default(0).notNull(),
     publishedAt: timestamp("publishedAt"),
@@ -307,6 +309,64 @@ export const novelFollows = mysqlTable(
   table => [uniqueIndex("novel_follows_user_novel_unique").on(table.userId, table.novelId)]
 );
 
+export const authorFollows = mysqlTable(
+  "author_follows",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    authorId: int("authorId").notNull().references(() => authors.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("author_follows_user_author_unique").on(table.userId, table.authorId), index("author_follows_author_idx").on(table.authorId)]
+);
+
+export const publicReadingLists = mysqlTable(
+  "public_reading_lists",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isPublic: boolean("isPublic").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("public_reading_lists_user_name_unique").on(table.userId, table.name), index("public_reading_lists_public_idx").on(table.isPublic, table.updatedAt)]
+);
+
+export const publicReadingListItems = mysqlTable(
+  "public_reading_list_items",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    listId: int("listId").notNull().references(() => publicReadingLists.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("public_reading_list_items_list_novel_unique").on(table.listId, table.novelId), index("public_reading_list_items_novel_idx").on(table.novelId)]
+);
+
+export const readLater = mysqlTable(
+  "read_later",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("read_later_user_novel_unique").on(table.userId, table.novelId), index("read_later_user_created_idx").on(table.userId, table.createdAt)]
+);
+
+export const userAchievements = mysqlTable(
+  "user_achievements",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    achievementKey: varchar("achievementKey", { length: 80 }).notNull(),
+    earnedAt: timestamp("earnedAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("user_achievements_user_key_unique").on(table.userId, table.achievementKey), index("user_achievements_user_earned_idx").on(table.userId, table.earnedAt)]
+);
+
 export const readingProgress = mysqlTable(
   "reading_progress",
   {
@@ -343,6 +403,32 @@ export const readingEvents = mysqlTable(
     index("reading_events_content_idx").on(table.novelId, table.chapterId, table.occurredAt),
     index("reading_events_user_idx").on(table.userId, table.occurredAt),
   ]
+);
+
+export const chapterComments = mysqlTable(
+  "chapter_comments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    chapterId: int("chapterId").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    body: varchar("body", { length: 1200 }).notNull(),
+    isHidden: boolean("isHidden").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("chapter_comments_chapter_created_idx").on(table.chapterId, table.createdAt), index("chapter_comments_user_idx").on(table.userId)]
+);
+
+export const commentReports = mysqlTable(
+  "comment_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    commentId: int("commentId").notNull().references(() => chapterComments.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reason: varchar("reason", { length: 250 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("comment_reports_user_comment_unique").on(table.userId, table.commentId), index("comment_reports_comment_idx").on(table.commentId)]
 );
 
 export const userNotificationPreferences = mysqlTable(

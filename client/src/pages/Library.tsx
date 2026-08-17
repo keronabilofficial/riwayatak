@@ -7,6 +7,7 @@ import { defaultLibraryPreferences, libraryPreferencesKey, parseLibraryPreferenc
 import { isReadingComplete } from "@/lib/readingCompletion";
 import { buildPersonalExportText, downloadTextFile, openPersonalExportPrint } from "@/lib/personalExport";
 import { matchesPersonalDate, matchesPersonalNovel, type PersonalDateFilter } from "@/lib/personalCollectionFilters";
+import LibraryCommunityHub from "@/components/LibraryCommunityHub";
 import { Ban, Bell, BookHeart, BookOpen, Clock3, FileDown, FileText, Filter, HeartOff, ListPlus, LogIn, Plus, Printer, Search, Share2, SlidersHorizontal, Sparkles, Star, Timer, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { startLogin } from "@/const";

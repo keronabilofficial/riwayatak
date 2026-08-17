@@ -16,6 +16,9 @@ import Reader from "./pages/Reader";
 import SearchPage from "./pages/SearchPage";
 import Plans from "./pages/Plans";
 import SubscriptionReturn from "./pages/SubscriptionReturn";
+import CommunityHub from "./pages/CommunityHub";
+import { PublicReadingListDetail, PublicReadingLists } from "./pages/PublicReadingLists";
+import AuthorAnalytics from "./pages/AuthorAnalytics";
 import AdminAuthors from "./pages/admin/AdminAuthors";
 import AdminNovels from "./pages/admin/AdminNovels";
 import AdminOperations from "./pages/admin/AdminOperations";
@@ -54,6 +57,10 @@ function Router() {
       <Route path={"/admin/system/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
+      <Route path={"/community"} component={CommunityHub} />
+      <Route path={"/lists"} component={PublicReadingLists} />
+      <Route path={"/lists/:id"}>{params => <PublicReadingListDetail id={params.id} />}</Route>
+      <Route path={"/author-insights"} component={AuthorAnalytics} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

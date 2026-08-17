@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   activityLogs,
   authors,
+  authorFollows,
   categories,
   chapters,
   favorites,
@@ -69,9 +70,17 @@ async function notifyChapterFollowers(novelId: number, chapterId: number, chapte
   await db.insert(notifications).values(optedInRecipients.map(userId => ({ userId, type: "new_chapter" as const, title: `فصل جديد من «${novel.title}»`, body: `نُشر فصل «${chapterTitle}» لرواية محفوظة لديك. يمكنك متابعته الآن.`, href: `/read/${novel.slug}/${chapter.slug}` })));
 }
 
+async function notifyAuthorFollowers(authorId: number, title: string, body: string, href: string) {
+  const db = await getDb();
+  if (!db) return;
+  const followers = await db.select({ userId: authorFollows.userId }).from(authorFollows).where(eq(authorFollows.authorId, authorId));
+  if (!followers.length) return;
+  await db.insert(notifications).values(followers.map(({ userId }) => ({ userId, type: "new_novel" as const, title, body, href })));
+}
+
 export const catalogRouter = router({
   home: publicProcedure.query(() => getHomeContent()),
-  listNovels: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional(), categorySlug: z.string().max(120).optional() })).query(({ input }) => listPublicNovels(input)),
+  listNovels: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional(), categorySlug: z.string().max(120).optional(), narrativeStatus: z.enum(["ongoing", "completed"]).optional(), audioOnly: z.boolean().optional(), length: z.enum(["short", "medium", "long"]).optional(), minRating: z.number().min(1).max(5).optional(), sort: z.enum(["latest", "title", "chapters", "rating"]).optional() })).query(({ input }) => listPublicNovels(input)),
   detail: publicProcedure.input(z.object({ slug: z.string().min(1).max(280) })).query(({ input }) => getPublicNovel(input.slug)),
   listAuthors: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional() })).query(({ input }) => listPublicAuthors(input)),
   author: publicProcedure.input(z.object({ slug: z.string().min(1).max(220) })).query(({ input }) => getPublicAuthor(input.slug)),
@@ -116,6 +125,11 @@ export const libraryRouter = router({
     const db = await requireDb();
     await db.insert(readingProgress).values({ userId: ctx.user.id, ...input, lastReadAt: new Date() }).onDuplicateKeyUpdate({ set: { chapterId: input.chapterId, characterOffset: input.characterOffset, progressPercent: input.progressPercent, isCompleted: input.isCompleted, lastReadAt: new Date() } });
     return { success: true };
+  }),
+  progress: protectedProcedure.input(z.object({ novelId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [progress] = await db.select({ chapterId: readingProgress.chapterId, characterOffset: readingProgress.characterOffset, progressPercent: readingProgress.progressPercent, isCompleted: readingProgress.isCompleted, lastReadAt: readingProgress.lastReadAt }).from(readingProgress).where(and(eq(readingProgress.userId, ctx.user.id), eq(readingProgress.novelId, input.novelId))).limit(1);
+    return progress ?? null;
   }),
   continueReading: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
@@ -402,13 +416,13 @@ export const adminRouter = router({
       const existing = await db.select({ status: novels.status, publishedAt: novels.publishedAt }).from(novels).where(eq(novels.id, input.id)).limit(1);
       await db.update(novels).set({ ...values, publishedAt: input.status === "published" && !existing[0]?.publishedAt ? now : existing[0]?.publishedAt ?? null }).where(eq(novels.id, input.id));
       await logActivity(ctx.user.id, "novel.updated", "novel", input.id, { status: input.status });
-      if (input.status === "published" && existing[0]?.status !== "published") await notifyOwner({ title: "نُشرت رواية جديدة", content: `تم نشر رواية «${input.title.trim()}».` });
+      if (input.status === "published" && existing[0]?.status !== "published") { await notifyOwner({ title: "نُشرت رواية جديدة", content: `تم نشر رواية «${input.title.trim()}».` }); await notifyAuthorFollowers(input.authorId, `رواية جديدة من مؤلف تتابعه`, `نشر المؤلف رواية «${input.title.trim()}».`, `/novels/${values.slug}`); }
       return { id: input.id };
     }
     const result = await db.insert(novels).values({ ...values, createdByUserId: ctx.user.id, publishedAt: input.status === "published" ? now : null });
     const id = Number(result[0].insertId);
     await logActivity(ctx.user.id, "novel.created", "novel", id, { status: input.status });
-    if (input.status === "published") await notifyOwner({ title: "نُشرت رواية جديدة", content: `تم نشر رواية «${input.title.trim()}».` });
+    if (input.status === "published") { await notifyOwner({ title: "نُشرت رواية جديدة", content: `تم نشر رواية «${input.title.trim()}».` }); await notifyAuthorFollowers(input.authorId, `رواية جديدة من مؤلف تتابعه`, `نشر المؤلف رواية «${input.title.trim()}».`, `/novels/${values.slug}`); }
     return { id };
   }),
   upsertChapter: editorProcedure.input(z.object({ id: z.number().int().optional(), novelId: z.number().int(), title: z.string().min(1).max(255), slug: z.string().max(280).optional(), sortOrder: z.number().int().min(1), content: z.string().min(1).max(200000), excerpt: z.string().max(1500).optional(), status: publicationStatus.default("draft") })).mutation(async ({ ctx, input }) => {
@@ -419,14 +433,14 @@ export const adminRouter = router({
       const existing = await db.select({ status: chapters.status, publishedAt: chapters.publishedAt }).from(chapters).where(eq(chapters.id, input.id)).limit(1);
       await db.update(chapters).set({ ...values, publishedAt: input.status === "published" && !existing[0]?.publishedAt ? now : existing[0]?.publishedAt ?? null }).where(eq(chapters.id, input.id));
       await logActivity(ctx.user.id, "chapter.updated", "chapter", input.id, { novelId: input.novelId, status: input.status });
-      if (input.status === "published" && existing[0]?.status !== "published") { await notifyOwner({ title: "نُشر فصل جديد", content: `تم نشر فصل «${input.title.trim()}».` }); await notifyChapterFollowers(input.novelId, input.id, input.title.trim()); }
+      if (input.status === "published" && existing[0]?.status !== "published") { await notifyOwner({ title: "نُشر فصل جديد", content: `تم نشر فصل «${input.title.trim()}».` }); await notifyChapterFollowers(input.novelId, input.id, input.title.trim()); const [novel] = await db.select({ authorId: novels.authorId, slug: novels.slug, title: novels.title }).from(novels).where(eq(novels.id, input.novelId)).limit(1); if (novel) await notifyAuthorFollowers(novel.authorId, `فصل جديد من مؤلف تتابعه`, `نشر فصل «${input.title.trim()}» لرواية «${novel.title}».`, `/read/${novel.slug}/${values.slug}`); }
       return { id: input.id };
     }
     const result = await db.insert(chapters).values({ ...values, createdByUserId: ctx.user.id, publishedAt: input.status === "published" ? now : null });
     const id = Number(result[0].insertId);
     await db.update(novels).set({ chapterCount: sql`${novels.chapterCount} + 1`, updatedByUserId: ctx.user.id }).where(eq(novels.id, input.novelId));
     await logActivity(ctx.user.id, "chapter.created", "chapter", id, { novelId: input.novelId, status: input.status });
-    if (input.status === "published") { await notifyOwner({ title: "نُشر فصل جديد", content: `تم نشر فصل «${input.title.trim()}».` }); await notifyChapterFollowers(input.novelId, id, input.title.trim()); }
+    if (input.status === "published") { await notifyOwner({ title: "نُشر فصل جديد", content: `تم نشر فصل «${input.title.trim()}».` }); await notifyChapterFollowers(input.novelId, id, input.title.trim()); const [novel] = await db.select({ authorId: novels.authorId, slug: novels.slug, title: novels.title }).from(novels).where(eq(novels.id, input.novelId)).limit(1); if (novel) await notifyAuthorFollowers(novel.authorId, `فصل جديد من مؤلف تتابعه`, `نشر فصل «${input.title.trim()}» لرواية «${novel.title}».`, `/read/${novel.slug}/${values.slug}`); }
     return { id };
   }),
   archiveChapter: editorProcedure.input(z.object({ id: z.number().int(), novelId: z.number().int() })).mutation(async ({ ctx, input }) => {

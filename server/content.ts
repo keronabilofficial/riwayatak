@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import {
   authors,
   categories,
@@ -8,6 +8,7 @@ import {
   novelCategories,
   novels,
   novelTags,
+  novelReviews,
   tags,
 } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -35,6 +36,11 @@ export type CatalogInput = {
   offset?: number;
   query?: string;
   categorySlug?: string;
+  narrativeStatus?: "ongoing" | "completed";
+  audioOnly?: boolean;
+  length?: "short" | "medium" | "long";
+  minRating?: number;
+  sort?: "latest" | "title" | "chapters" | "rating";
 };
 
 export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
@@ -66,6 +72,13 @@ export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: No
       .where(and(eq(categories.slug, input.categorySlug), eq(categories.isVisible, true)));
     conditions.push(inArray(novels.id, categoryNovelIds));
   }
+  if (input.narrativeStatus) conditions.push(eq(novels.narrativeStatus, input.narrativeStatus));
+  if (input.audioOnly) conditions.push(sql`EXISTS (SELECT 1 FROM ${chapters} c INNER JOIN ${chapterAudio} ca ON ca.chapterId = c.id WHERE c.novelId = ${novels.id} AND c.status = 'published')`);
+  if (input.length === "short") conditions.push(sql`${novels.chapterCount} <= 10`);
+  if (input.length === "medium") conditions.push(sql`${novels.chapterCount} BETWEEN 11 AND 30`);
+  if (input.length === "long") conditions.push(sql`${novels.chapterCount} > 30`);
+  if (input.minRating) conditions.push(sql`COALESCE((SELECT AVG(${novelReviews.rating}) FROM ${novelReviews} WHERE ${novelReviews.novelId} = ${novels.id}), 0) >= ${input.minRating}`);
+  const orderBy = input.sort === "title" ? [asc(novels.title)] : input.sort === "chapters" ? [desc(novels.chapterCount), desc(novels.updatedAt)] : input.sort === "rating" ? [desc(sql`COALESCE((SELECT AVG(${novelReviews.rating}) FROM ${novelReviews} WHERE ${novelReviews.novelId} = ${novels.id}), 0)`), desc(novels.updatedAt)] : [desc(novels.isFeatured), desc(novels.updatedAt)];
 
   return db
     .select(publicNovelFields)
@@ -73,7 +86,7 @@ export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: No
     .innerJoin(authors, eq(novels.authorId, authors.id))
     .leftJoin(media, eq(novels.coverMediaId, media.id))
     .where(and(...conditions))
-    .orderBy(desc(novels.isFeatured), desc(novels.updatedAt))
+    .orderBy(...orderBy)
     .limit(limit)
     .offset(offset);
 }

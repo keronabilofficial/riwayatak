@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
 import AudioPlayerMock from "@/components/AudioPlayerMock";
+import ChapterComments from "@/components/ChapterComments";
 import { parseReaderFontScale, readerFontScaleKey } from "@/lib/readerPreferences";
 import { ArrowRight, BookmarkPlus, Check, ChevronLeft, ChevronRight, Headphones, List, LockKeyhole, Minus, Moon, Plus, Quote, Settings2, Sun, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -19,7 +20,9 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<{ text: string } | null>(null);
   const articleRef = useRef<HTMLElement | null>(null);
+  const lastProgressRef = useRef(-1);
   const { data: quotes } = trpc.library.quotes.useQuery({ chapterId: chapter?.chapterId }, { enabled: isAuthenticated && Boolean(chapter?.chapterId) });
+  const { data: syncedProgress, isLoading: isProgressLoading } = trpc.library.progress.useQuery({ novelId: chapter?.novelId ?? 0 }, { enabled: isAuthenticated && Boolean(chapter?.novelId) });
   const utils = trpc.useUtils();
   const saveQuote = trpc.library.saveQuote.useMutation({ onSuccess: () => { setSelectedQuote(null); void utils.library.quotes.invalidate({ chapterId: chapter?.chapterId }); } });
   const deleteQuote = trpc.library.deleteQuote.useMutation({ onSuccess: () => void utils.library.quotes.invalidate({ chapterId: chapter?.chapterId }) });
@@ -41,10 +44,30 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
   }, [fontScale]);
 
   useEffect(() => {
-    if (!chapter || !chapter.access.allowed) return;
+    if (!chapter || !chapter.access.allowed || isProgressLoading) return;
     recordView.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, eventType: "chapter_open" });
-    if (isAuthenticated) saveProgress.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, characterOffset: 0, progressPercent: 0, isCompleted: false });
-  }, [chapter?.chapterId, chapter?.novelId, isAuthenticated]);
+    if (isAuthenticated && !syncedProgress) saveProgress.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, characterOffset: 0, progressPercent: 0, isCompleted: false });
+    if (isAuthenticated && syncedProgress?.chapterId === chapter.chapterId && syncedProgress.progressPercent > 0) {
+      lastProgressRef.current = syncedProgress.progressPercent;
+      window.requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, (document.documentElement.scrollHeight - window.innerHeight) * (syncedProgress.progressPercent / 100)), behavior: "instant" as ScrollBehavior }));
+    }
+  }, [chapter?.chapterId, chapter?.novelId, chapter?.access.allowed, isAuthenticated, isProgressLoading, syncedProgress?.chapterId, syncedProgress?.progressPercent]);
+
+  useEffect(() => {
+    if (!chapter || !chapter.access.allowed || !isAuthenticated) return;
+    let frame = 0;
+    const persistPosition = () => {
+      frame = 0;
+      const total = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const progressPercent = Math.max(0, Math.min(100, Math.round((window.scrollY / total) * 100)));
+      if (Math.abs(progressPercent - lastProgressRef.current) < 4 && progressPercent !== 100) return;
+      lastProgressRef.current = progressPercent;
+      saveProgress.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, characterOffset: Math.round((chapter.content.length * progressPercent) / 100), progressPercent, isCompleted: progressPercent >= 100 });
+    };
+    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(persistPosition); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { if (frame) window.cancelAnimationFrame(frame); window.removeEventListener("scroll", onScroll); };
+  }, [chapter?.chapterId, chapter?.novelId, chapter?.content, chapter?.access.allowed, isAuthenticated]);
 
   useEffect(() => {
     if (!chapter || !chapter.access.allowed || !isAuthenticated) return;
@@ -81,7 +104,7 @@ export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; 
         <div className="mx-auto mt-5 h-px w-16 bg-[#af7c42]" />
         {!chapter.access.allowed ? <section className="mx-auto mt-10 max-w-xl rounded-3xl border border-[#af7c42]/30 bg-card p-7 text-center shadow-sm"><LockKeyhole className="mx-auto h-7 w-7 text-[#af7c42]" /><h2 className="mt-4 font-serif text-2xl">هذا الفصل متاح للمشتركين</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">{chapter.access.reason}</p><Link href="/plans" className="mt-5 inline-flex rounded-xl bg-[#af7c42] px-5 py-3 text-sm font-bold text-white">عرض الباقات</Link></section> : <>
           {chapter.hasAudio ? <section className="mx-auto mt-7 max-w-xl rounded-2xl border border-current/10 bg-current/5 p-4"><div className="flex items-center gap-2 text-sm font-bold"><Headphones className="h-4 w-4 text-[#af7c42]" />استمع إلى الفصل</div>{audioUrl ? <audio controls preload="metadata" src={audioUrl} className="mt-3 w-full" /> : <button type="button" onClick={() => listenChapter.mutate({ chapterId: chapter.chapterId })} disabled={listenChapter.isPending} className="mt-3 rounded-lg bg-[#af7c42] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{listenChapter.isPending ? "جارٍ التحقق..." : "بدء الاستماع"}</button>}{listenChapter.error && <p className="mt-3 text-sm text-destructive">تعذر التحقق من صلاحية الاستماع الآن. حاول مرة أخرى أو راجع حالة اشتراكك.</p>}</section> : <AudioPlayerMock novelTitle={chapter.novelTitle} chapterTitle={chapter.chapterTitle} currentChapterSlug={chapter.chapterSlug} chapters={chapter.chapters} />}
-          {selectedQuote ? <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-[#af7c42]/35 bg-[#af7c42]/10 px-4 py-3 text-sm" role="status"><Quote className="h-4 w-4 shrink-0 text-[#af7c42]" /><p className="min-w-0 flex-1 truncate">«{selectedQuote.text}»</p><Button type="button" size="sm" className="gap-1 bg-[#af7c42] text-white hover:bg-[#936536]" disabled={saveQuote.isPending} onClick={() => saveQuote.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, selectedText: selectedQuote.text })}>{saveQuote.isPending ? "جارٍ الحفظ…" : <><BookmarkPlus className="h-4 w-4" />حفظ الاقتباس</>}</Button><Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="إلغاء تحديد الاقتباس" onClick={() => setSelectedQuote(null)}><X className="h-4 w-4" /></Button></div> : null}<article ref={articleRef} onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection} className="mt-12 select-text font-serif leading-[2.35]" style={{ fontSize: `${fontScale}rem` }}>{paragraphs.map((paragraph, index) => <p key={index} className="mb-8">{paragraph}</p>)}</article>{isAuthenticated ? <section className="mt-12 rounded-2xl border border-current/10 bg-current/5 p-5"><div className="flex items-center gap-2"><Quote className="h-4 w-4 text-[#af7c42]" /><h2 className="font-serif text-xl">اقتباساتك المحفوظة</h2><span className="text-xs opacity-60">({quotes?.length ?? 0})</span></div>{quotes?.length ? <div className="mt-4 grid gap-3">{quotes.map(item => <div key={item.id} className="rounded-xl border border-current/10 bg-background/60 p-4"><blockquote className="border-r-2 border-[#af7c42] pr-3 text-sm leading-7">«{item.selectedText}»</blockquote><div className="mt-3 flex items-center justify-between gap-2"><small className="opacity-60">حُفظ في {new Date(item.createdAt).toLocaleDateString("ar-EG")}</small><Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" disabled={deleteQuote.isPending} onClick={() => deleteQuote.mutate({ id: item.id })}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button></div></div>)}</div> : <p className="mt-3 text-sm leading-7 opacity-65">حدد جملة من النص ثم اختر «حفظ الاقتباس» لتظهر هنا وتظل خاصة بحسابك.</p>}</section> : null}
+          {selectedQuote ? <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-[#af7c42]/35 bg-[#af7c42]/10 px-4 py-3 text-sm" role="status"><Quote className="h-4 w-4 shrink-0 text-[#af7c42]" /><p className="min-w-0 flex-1 truncate">«{selectedQuote.text}»</p><Button type="button" size="sm" className="gap-1 bg-[#af7c42] text-white hover:bg-[#936536]" disabled={saveQuote.isPending} onClick={() => saveQuote.mutate({ novelId: chapter.novelId, chapterId: chapter.chapterId, selectedText: selectedQuote.text })}>{saveQuote.isPending ? "جارٍ الحفظ…" : <><BookmarkPlus className="h-4 w-4" />حفظ الاقتباس</>}</Button><Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="إلغاء تحديد الاقتباس" onClick={() => setSelectedQuote(null)}><X className="h-4 w-4" /></Button></div> : null}<article ref={articleRef} onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection} className="mt-12 select-text font-serif leading-[2.35]" style={{ fontSize: `${fontScale}rem` }}>{paragraphs.map((paragraph, index) => <p key={index} className="mb-8">{paragraph}</p>)}</article>{isAuthenticated ? <section className="mt-12 rounded-2xl border border-current/10 bg-current/5 p-5"><div className="flex items-center gap-2"><Quote className="h-4 w-4 text-[#af7c42]" /><h2 className="font-serif text-xl">اقتباساتك المحفوظة</h2><span className="text-xs opacity-60">({quotes?.length ?? 0})</span></div>{quotes?.length ? <div className="mt-4 grid gap-3">{quotes.map(item => <div key={item.id} className="rounded-xl border border-current/10 bg-background/60 p-4"><blockquote className="border-r-2 border-[#af7c42] pr-3 text-sm leading-7">«{item.selectedText}»</blockquote><div className="mt-3 flex items-center justify-between gap-2"><small className="opacity-60">حُفظ في {new Date(item.createdAt).toLocaleDateString("ar-EG")}</small><Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" disabled={deleteQuote.isPending} onClick={() => deleteQuote.mutate({ id: item.id })}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button></div></div>)}</div> : <p className="mt-3 text-sm leading-7 opacity-65">حدد جملة من النص ثم اختر «حفظ الاقتباس» لتظهر هنا وتظل خاصة بحسابك.</p>}</section> : null}<ChapterComments chapterId={chapter.chapterId} />
         </>}
         <nav className="mt-14 flex items-center justify-between gap-4 border-t border-current/10 pt-7">
           {chapter.previous ? <Link href={`/read/${chapter.novelSlug}/${chapter.previous.slug}`} className="inline-flex items-center gap-2 text-sm font-bold hover:text-[#af7c42]"><ChevronRight className="h-5 w-5" /><span><small className="block font-normal opacity-60">السابق</small>{chapter.previous.title}</span></Link> : <span />}
