@@ -20,6 +20,7 @@ import {
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { canAuthorReply } from "../lib/authorReply";
 
 async function requireDb() {
   const db = await getDb();
@@ -146,6 +147,14 @@ export const communityRouter = router({
     const [created] = await db.insert(chapterComments).values({ userId: ctx.user.id, ...input }).$returningId();
     return { id: created.id };
   }),
+  authorReply: editorProcedure.input(z.object({ commentId: z.number().int().positive(), body: z.string().trim().min(2).max(1200) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [comment] = await db.select({ commentId: chapterComments.id, chapterId: chapters.id, chapterStatus: chapters.status, ownerId: novels.createdByUserId, recipientId: chapterComments.userId, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug }).from(chapterComments).innerJoin(chapters, eq(chapterComments.chapterId, chapters.id)).innerJoin(novels, eq(chapters.novelId, novels.id)).where(eq(chapterComments.id, input.commentId)).limit(1);
+    if (!comment || !canAuthorReply({ chapterStatus: comment.chapterStatus, ownerId: comment.ownerId, userId: ctx.user.id })) throw new Error("لا تملك صلاحية الرد على هذا التعليق.");
+    const [created] = await db.insert(chapterComments).values({ chapterId: comment.chapterId, userId: ctx.user.id, body: `رد المؤلف: ${input.body}` }).$returningId();
+    if (comment.recipientId !== ctx.user.id) await db.insert(notifications).values({ userId: comment.recipientId, type: "system", title: "رد المؤلف على تعليقك", body: `رد مؤلف رواية «${comment.novelTitle}» على تعليقك.`, href: `/read/${comment.novelSlug}/${comment.chapterSlug}` });
+    return { id: created.id };
+  }),
   deleteComment: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     await db.delete(chapterComments).where(and(eq(chapterComments.id, input.id), eq(chapterComments.userId, ctx.user.id)));
@@ -173,6 +182,10 @@ export const communityRouter = router({
       ]);
       return { ...novel, favorites: favoritesCount.total, completions: completedCount.total, views: viewCount.total, averageRating: rating.average ?? 0 };
     }));
-    return rows;
+    const [recentComments, unreadRows] = await Promise.all([
+      db.select({ id: chapterComments.id, body: chapterComments.body, createdAt: chapterComments.createdAt, chapterId: chapters.id, chapterTitle: chapters.title, novelTitle: novels.title, userName: users.name }).from(chapterComments).innerJoin(chapters, eq(chapterComments.chapterId, chapters.id)).innerJoin(novels, eq(chapters.novelId, novels.id)).innerJoin(users, eq(chapterComments.userId, users.id)).where(and(eq(novels.createdByUserId, ctx.user.id), eq(chapterComments.isHidden, false))).orderBy(desc(chapterComments.createdAt)).limit(12),
+      db.select({ total: count() }).from(notifications).where(and(eq(notifications.userId, ctx.user.id), eq(notifications.isRead, false))),
+    ]);
+    return { novels: rows, recentComments, unreadNotifications: Number(unreadRows[0]?.total ?? 0) };
   }),
 });
