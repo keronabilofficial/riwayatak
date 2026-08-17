@@ -1,0 +1,15 @@
+import PublicLayout from "@/components/PublicLayout";
+import { trpc } from "@/lib/trpc";
+import { Link } from "wouter";
+
+export function PublicReadingLists() {
+  const { data: lists, isLoading } = trpc.community.publicLists.useQuery();
+  return <PublicLayout><section className="container py-16"><p className="text-sm font-bold text-[#af7c42]">مشاركة القراءة</p><h1 className="mt-3 font-serif text-5xl text-[#1d2940]">قوائم القراء</h1><p className="mt-4 max-w-2xl leading-8 text-[#667085]">اكتشف قوائم القراءة التي اختار أصحابها مشاركتها مع مجتمع القراء.</p>{isLoading ? <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-40 animate-pulse rounded-2xl bg-[#e9dfca]" />)}</div> : lists?.length ? <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{lists.map(list => <Link key={list.id} href={`/lists/${list.id}`} className="rounded-2xl border border-[#1d2940]/10 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg"><h2 className="font-serif text-2xl text-[#1d2940]">{list.name}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-[#667085]">{list.description || "قائمة يشاركها قارئ من مجتمع روايتك بالعربية."}</p><div className="mt-4 flex justify-between text-xs text-[#af7c42]"><span>{list.itemCount} روايات</span><span>{list.ownerName || "قارئ"}</span></div></Link>)}</div> : <p className="mt-8 rounded-2xl border border-dashed border-[#af7c42]/30 p-8 text-center text-sm text-[#667085]">لا توجد قوائم عامة بعد. يمكنك إنشاء قائمة من صفحة المجتمع واختيار مشاركتها.</p>}</section></PublicLayout>;
+}
+
+export function PublicReadingListDetail({ id }: { id: string }) {
+  const { data: list, isLoading } = trpc.community.publicList.useQuery({ id: Number(id) });
+  if (isLoading) return <PublicLayout><div className="container py-20"><div className="h-80 animate-pulse rounded-3xl bg-[#e9dfca]" /></div></PublicLayout>;
+  if (!list) return <PublicLayout><div className="container py-20 text-center"><h1 className="font-serif text-4xl">هذه القائمة غير متاحة</h1><Link href="/lists" className="mt-4 inline-block text-[#af7c42]">استعرض القوائم العامة</Link></div></PublicLayout>;
+  return <PublicLayout><section className="container py-16"><p className="text-sm font-bold text-[#af7c42]">قائمة قارئ</p><h1 className="mt-3 font-serif text-5xl text-[#1d2940]">{list.name}</h1><p className="mt-4 max-w-2xl leading-8 text-[#667085]">{list.description || "قائمة قراءة مشتركة."}</p><p className="mt-3 text-xs text-[#667085]">أنشأها {list.ownerName || "قارئ"}</p><div className="mt-10 grid gap-4 md:grid-cols-2">{list.items.map(item => <Link key={item.novelId} href={`/novels/${item.slug}`} className="rounded-2xl border border-[#1d2940]/10 bg-white p-5 hover:shadow-md"><h2 className="font-serif text-2xl text-[#1d2940]">{item.title}</h2><p className="mt-1 text-sm text-[#af7c42]">{item.authorName}</p><p className="mt-3 text-sm leading-7 text-[#667085]">{item.shortDescription || "اكتشف هذه الرواية من خلال القائمة."}</p></Link>)}</div></section></PublicLayout>;
+}

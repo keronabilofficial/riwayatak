@@ -127,6 +127,69 @@
       "when": 1786947059109,
       "tag": "0017_volatile_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786951919933,
+      "tag": "0018_thin_gravity",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1786956392486,
+      "tag": "0019_optimal_grim_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1786961738669,
+      "tag": "0020_lethal_gamma_corps",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1786965460921,
+      "tag": "0021_robust_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1786968569655,
+      "tag": "0022_uneven_thunderbolt_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1786969096468,
+      "tag": "0023_remarkable_molly_hayes",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786969836141,
+      "tag": "0024_great_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1786970339690,
+      "tag": "0025_fair_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1786970989318,
+      "tag": "0026_massive_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

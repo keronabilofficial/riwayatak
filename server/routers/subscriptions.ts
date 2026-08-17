@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, count, desc, eq, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { chapterAudio, chapters, subscriptionCycles, subscriptions } from "../../drizzle/schema";
+import { chapterAudio, chapters, subscriptionAudioAccess, subscriptionCycles, subscriptionNovelAccess, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { storageGetSignedUrl } from "../storage";
 import { createPaymobCheckout } from "../lib/paymob";
 import { expireDueSubscriptionCycles, getAudioListenerAccess } from "../lib/subscriptionAccess";
 import { getManagedPlan, getManagedPlans, managedPlanToSubscriptionOption } from "../lib/platformSettings";
@@ -25,17 +26,30 @@ function getRequestOrigin(request: { get: (name: string) => string | undefined }
 
 export const subscriptionsRouter = router({
   plans: publicProcedure.query(async () => (await getManagedPlans()).filter(plan => plan.enabled).map(managedPlanToSubscriptionOption)),
+  history: protectedProcedure.query(async ({ ctx }) => {
+    const database = await requireDb();
+    return database.select({ planName: subscriptions.planName, billingTerm: subscriptions.billingTerm, subscriptionStatus: subscriptions.status, cycleStatus: subscriptionCycles.status, amountEgp: subscriptionCycles.priceEgpSnapshot, orderId: subscriptionCycles.providerOrderId, transactionId: subscriptionCycles.providerTransactionId, startsAt: subscriptionCycles.startsAt, endsAt: subscriptionCycles.endsAt, createdAt: subscriptionCycles.createdAt }).from(subscriptionCycles).innerJoin(subscriptions, eq(subscriptionCycles.subscriptionId, subscriptions.id)).where(eq(subscriptions.userId, ctx.user.id)).orderBy(desc(subscriptionCycles.createdAt)).limit(12);
+  }),
   mine: protectedProcedure.query(async ({ ctx }) => {
     await expireDueSubscriptionCycles(ctx.user.id);
     const database = await requireDb();
     const rows = await database
-      .select({ subscriptionId: subscriptions.id, planName: subscriptions.planName, billingTerm: subscriptions.billingTerm, subscriptionStatus: subscriptions.status, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd, cycleStatus: subscriptionCycles.status, startsAt: subscriptionCycles.startsAt, endsAt: subscriptionCycles.endsAt })
+      .select({ cycleId: subscriptionCycles.id, subscriptionId: subscriptions.id, planName: subscriptions.planName, billingTerm: subscriptions.billingTerm, subscriptionStatus: subscriptions.status, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd, cycleStatus: subscriptionCycles.status, startsAt: subscriptionCycles.startsAt, endsAt: subscriptionCycles.endsAt, novelLimit: subscriptionCycles.novelLimitSnapshot, audioChapterLimit: subscriptionCycles.audioChapterLimitSnapshot })
       .from(subscriptionCycles)
       .innerJoin(subscriptions, eq(subscriptionCycles.subscriptionId, subscriptions.id))
       .where(and(eq(subscriptions.userId, ctx.user.id), gt(subscriptionCycles.endsAt, new Date())))
       .orderBy(desc(subscriptionCycles.createdAt))
       .limit(1);
-    return rows[0] ?? null;
+    const current = rows[0];
+    if (!current) return null;
+    const [novelUsage, audioUsage] = await Promise.all([
+      database.select({ total: count() }).from(subscriptionNovelAccess).where(eq(subscriptionNovelAccess.cycleId, current.cycleId)),
+      database.select({ total: count() }).from(subscriptionAudioAccess).where(eq(subscriptionAudioAccess.cycleId, current.cycleId)),
+    ]);
+    const novelsUsed = Number(novelUsage[0]?.total ?? 0);
+    const audioChaptersUsed = Number(audioUsage[0]?.total ?? 0);
+    const daysRemaining = current.endsAt ? Math.max(0, Math.ceil((new Date(current.endsAt).getTime() - Date.now()) / 86_400_000)) : null;
+    return { ...current, novelsUsed, audioChaptersUsed, novelsRemaining: Math.max(0, current.novelLimit - novelsUsed), audioChaptersRemaining: current.audioChapterLimit === null || current.audioChapterLimit === undefined ? null : Math.max(0, current.audioChapterLimit - audioChaptersUsed), daysRemaining };
   }),
   startCheckout: protectedProcedure.input(planInput.extend({ billingEmail: z.string().email(), phoneNumber: z.string().regex(/^\+[1-9]\d{7,14}$/, "أدخل رقم هاتف بصيغة دولية مثل +201..." ) })).mutation(async ({ ctx, input }) => {
     const managedPlan = await getManagedPlan(input.planName, input.billingTerm);
@@ -77,12 +91,18 @@ export const subscriptionsRouter = router({
   }),
   listenChapter: protectedProcedure.input(z.object({ chapterId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const database = await requireDb();
-    const audioRows = await database.select({ novelId: chapters.novelId, audioUrl: chapterAudio.url }).from(chapterAudio).innerJoin(chapters, eq(chapterAudio.chapterId, chapters.id)).where(eq(chapterAudio.chapterId, input.chapterId)).limit(1);
+    const audioRows = await database.select({ novelId: chapters.novelId, audioKey: chapterAudio.storageKey }).from(chapterAudio).innerJoin(chapters, eq(chapterAudio.chapterId, chapters.id)).where(eq(chapterAudio.chapterId, input.chapterId)).limit(1);
     const audio = audioRows[0];
     if (!audio) throw new TRPCError({ code: "NOT_FOUND", message: "لا يتوفر تسجيل صوتي لهذا الفصل." });
     const access = await getAudioListenerAccess(ctx.user.id, { chapterId: input.chapterId, novelId: audio.novelId });
     if (!access.allowed) throw new TRPCError({ code: "FORBIDDEN", message: access.reason });
-    return { audioUrl: audio.audioUrl };
+    let audioUrl: string;
+    try {
+      audioUrl = await storageGetSignedUrl(audio.audioKey);
+    } catch {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تجهيز رابط الاستماع المؤقت. حاول مرة أخرى لاحقًا." });
+    }
+    return { audioUrl, expiresInSeconds: 900 };
   }),
   cancelAtPeriodEnd: protectedProcedure.mutation(async ({ ctx }) => {
     const database = await requireDb();

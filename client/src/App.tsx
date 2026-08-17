@@ -4,18 +4,24 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import AuthorDetail from "./pages/AuthorDetail";
 import Authors from "./pages/Authors";
 import Categories from "./pages/Categories";
 import Home from "./pages/Home";
 import Legal from "./pages/Legal";
 import Library from "./pages/Library";
+import Profile from "./pages/Profile";
+import Rewards from "./pages/Rewards";
 import NovelDetail from "./pages/NovelDetail";
 import Novels from "./pages/Novels";
 import Reader from "./pages/Reader";
 import SearchPage from "./pages/SearchPage";
 import Plans from "./pages/Plans";
 import SubscriptionReturn from "./pages/SubscriptionReturn";
+import CommunityHub from "./pages/CommunityHub";
+import { PublicReadingListDetail, PublicReadingLists } from "./pages/PublicReadingLists";
+import AuthorAnalytics from "./pages/AuthorAnalytics";
 import AdminAuthors from "./pages/admin/AdminAuthors";
 import AdminNovels from "./pages/admin/AdminNovels";
 import AdminOperations from "./pages/admin/AdminOperations";
@@ -27,6 +33,8 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPlansSettings from "./pages/admin/AdminPlansSettings";
 import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
 import AdminSocialLinks from "./pages/admin/AdminSocialLinks";
+import AdminTranslations from "./pages/admin/AdminTranslations";
+import AdminContactMessages from "./pages/admin/AdminContactMessages";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -53,9 +61,17 @@ function Router() {
       <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
       <Route path={"/admin/system/social"} component={AdminSocialLinks} />
       <Route path={"/admin/media"} component={AdminMedia} />
+      <Route path={"/admin/translations"} component={AdminTranslations} />
+      <Route path={"/admin/contact"} component={AdminContactMessages} />
       <Route path={"/admin/system/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
+      <Route path={"/profile"} component={Profile} />
+      <Route path={"/rewards"} component={Rewards} />
+      <Route path={"/community"} component={CommunityHub} />
+      <Route path={"/lists"} component={PublicReadingLists} />
+      <Route path={"/lists/:id"}>{params => <PublicReadingListDetail id={params.id} />}</Route>
+      <Route path={"/author-insights"} component={AuthorAnalytics} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -75,10 +91,12 @@ function App() {
         defaultTheme="light"
         switchable
       >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

@@ -1,7 +1,7 @@
 import { parse as parseCookie } from "cookie";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { scheduledJobs } from "../../drizzle/schema";
+import { activityLogs, scheduledJobs, users } from "../../drizzle/schema";
 import { COOKIE_NAME } from "../../shared/const";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { ENV } from "../_core/env";
@@ -12,13 +12,33 @@ import { adminProcedure, router } from "../_core/trpc";
 const jobDefinitions = {
   "advanced-backup": { cron: "0 0 2 * * *", path: "/api/scheduled/operations", description: "نسخة محتوى متقدمة يومية" },
   "daily-operations-report": { cron: "0 0 8 * * *", path: "/api/scheduled/operations", description: "تقرير تشغيل يومي" },
+  "scheduled-publications": { cron: "0 */5 * * * *", path: "/api/scheduled/operations", description: "نشر الفصول التي حان موعدها" },
 } as const;
 
 export const operationsRouter = router({
   status: adminProcedure.query(() => getOperationsStatus()),
+  auditLogs: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(40) }).optional()).query(async ({ input }) => {
+    const database = await db.getDb();
+    if (!database) throw new Error("قاعدة البيانات غير متاحة.");
+    return database.select({
+      id: activityLogs.id,
+      action: activityLogs.action,
+      entityType: activityLogs.entityType,
+      entityId: activityLogs.entityId,
+      metadata: activityLogs.metadata,
+      createdAt: activityLogs.createdAt,
+      actorName: users.name,
+      actorUserId: activityLogs.actorUserId,
+    }).from(activityLogs).leftJoin(users, eq(activityLogs.actorUserId, users.id)).orderBy(desc(activityLogs.createdAt)).limit(input?.limit ?? 40);
+  }),
+  scheduledJobs: adminProcedure.query(async () => {
+    const database = await db.getDb();
+    if (!database) throw new Error("قاعدة البيانات غير متاحة.");
+    return database.select().from(scheduledJobs).orderBy(desc(scheduledJobs.updatedAt));
+  }),
   runSnapshotNow: adminProcedure.mutation(() => runContentSnapshot()),
   runReportNow: adminProcedure.mutation(() => sendDailyOperationsReport()),
-  configureSchedule: adminProcedure.input(z.object({ jobKey: z.enum(["advanced-backup", "daily-operations-report"]), cron: z.string().min(11).max(80).optional() })).mutation(async ({ ctx, input }) => {
+  configureSchedule: adminProcedure.input(z.object({ jobKey: z.enum(["advanced-backup", "daily-operations-report", "scheduled-publications"]), cron: z.string().min(11).max(80).optional() })).mutation(async ({ ctx, input }) => {
     if (!ENV.isProduction) throw new Error("انشر المنصة أولًا قبل تفعيل المهام الدورية.");
     const database = await db.getDb();
     if (!database) throw new Error("قاعدة البيانات غير متاحة.");

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import {
   authors,
   categories,
@@ -8,7 +8,12 @@ import {
   novelCategories,
   novels,
   novelTags,
+  novelReviews,
   tags,
+  novelTranslations,
+  authorTranslations,
+  chapterTranslations,
+  categoryTranslations,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { normalizeArabic } from "./lib/arabic";
@@ -35,9 +40,14 @@ export type CatalogInput = {
   offset?: number;
   query?: string;
   categorySlug?: string;
+  narrativeStatus?: "ongoing" | "completed";
+  audioOnly?: boolean;
+  length?: "short" | "medium" | "long";
+  minRating?: number;
+  sort?: "latest" | "title" | "chapters" | "rating";
 };
 
-export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>, languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = dbOverride ?? await getDb();
   if (!db) return [];
   const limit = Math.min(Math.max(input.limit ?? 18, 1), 48);
@@ -66,19 +76,26 @@ export async function listPublicNovels(input: CatalogInput = {}, dbOverride?: No
       .where(and(eq(categories.slug, input.categorySlug), eq(categories.isVisible, true)));
     conditions.push(inArray(novels.id, categoryNovelIds));
   }
+  if (input.narrativeStatus) conditions.push(eq(novels.narrativeStatus, input.narrativeStatus));
+  if (input.audioOnly) conditions.push(sql`EXISTS (SELECT 1 FROM ${chapters} c INNER JOIN ${chapterAudio} ca ON ca.chapterId = c.id WHERE c.novelId = ${novels.id} AND c.status = 'published')`);
+  if (input.length === "short") conditions.push(sql`${novels.chapterCount} <= 10`);
+  if (input.length === "medium") conditions.push(sql`${novels.chapterCount} BETWEEN 11 AND 30`);
+  if (input.length === "long") conditions.push(sql`${novels.chapterCount} > 30`);
+  if (input.minRating) conditions.push(sql`COALESCE((SELECT AVG(${novelReviews.rating}) FROM ${novelReviews} WHERE ${novelReviews.novelId} = ${novels.id}), 0) >= ${input.minRating}`);
+  const orderBy = input.sort === "title" ? [asc(novels.title)] : input.sort === "chapters" ? [desc(novels.chapterCount), desc(novels.updatedAt)] : input.sort === "rating" ? [desc(sql`COALESCE((SELECT AVG(${novelReviews.rating}) FROM ${novelReviews} WHERE ${novelReviews.novelId} = ${novels.id}), 0)`), desc(novels.updatedAt)] : [desc(novels.isFeatured), desc(novels.updatedAt)];
 
-  return db
-    .select(publicNovelFields)
-    .from(novels)
-    .innerJoin(authors, eq(novels.authorId, authors.id))
-    .leftJoin(media, eq(novels.coverMediaId, media.id))
-    .where(and(...conditions))
-    .orderBy(desc(novels.isFeatured), desc(novels.updatedAt))
-    .limit(limit)
-    .offset(offset);
+  const rows = await db.select(publicNovelFields).from(novels).innerJoin(authors, eq(novels.authorId, authors.id)).leftJoin(media, eq(novels.coverMediaId, media.id)).where(and(...conditions)).orderBy(...orderBy).limit(limit).offset(offset);
+  if (languageCode === "ar" || !rows.length) return rows;
+  const novelIds = rows.map(row => row.id);
+  const translations = await db.select({ novelId: novelTranslations.novelId, title: novelTranslations.title, subtitle: novelTranslations.subtitle, shortDescription: novelTranslations.shortDescription, authorId: novels.authorId }).from(novelTranslations).innerJoin(novels, eq(novelTranslations.novelId, novels.id)).where(and(inArray(novelTranslations.novelId, novelIds), eq(novelTranslations.languageCode, languageCode), eq(novelTranslations.status, "published")));
+  const byNovel = new Map(translations.map(item => [item.novelId, item]));
+  const authorIds = Array.from(new Set(translations.map(item => item.authorId)));
+  const authorRows = authorIds.length ? await db.select({ authorId: authorTranslations.authorId, displayName: authorTranslations.displayName }).from(authorTranslations).where(and(inArray(authorTranslations.authorId, authorIds), eq(authorTranslations.languageCode, languageCode), eq(authorTranslations.status, "published"))) : [];
+  const byAuthor = new Map(authorRows.map(item => [item.authorId, item.displayName]));
+  return rows.map(row => { const translation = byNovel.get(row.id); return translation ? { ...row, title: translation.title, subtitle: translation.subtitle, shortDescription: translation.shortDescription, authorName: byAuthor.get(translation.authorId) ?? row.authorName } : row; });
 }
 
-export async function getPublicNovel(slug: string) {
+export async function getPublicNovel(slug: string, languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
@@ -124,10 +141,15 @@ export async function getPublicNovel(slug: string) {
       .limit(4),
   ]);
 
-  return { ...novel, chapters: chapterRows, categories: categoryRows, tags: tagRows, related: relatedRows.filter(item => item.id !== novel.id) };
+  if (languageCode === "ar") return { ...novel, chapters: chapterRows, categories: categoryRows, tags: tagRows, related: relatedRows.filter(item => item.id !== novel.id) };
+  const [novelTranslation] = await db.select({ title: novelTranslations.title, subtitle: novelTranslations.subtitle, shortDescription: novelTranslations.shortDescription, description: novelTranslations.description, seoTitle: novelTranslations.seoTitle, seoDescription: novelTranslations.seoDescription }).from(novelTranslations).where(and(eq(novelTranslations.novelId, novel.id), eq(novelTranslations.languageCode, languageCode), eq(novelTranslations.status, "published"))).limit(1);
+  const translatedChapters = await db.select({ id: chapterTranslations.chapterId, title: chapterTranslations.title, slug: chapters.slug, sortOrder: chapters.sortOrder, publishedAt: chapters.publishedAt }).from(chapterTranslations).innerJoin(chapters, eq(chapterTranslations.chapterId, chapters.id)).where(and(eq(chapters.novelId, novel.id), eq(chapterTranslations.languageCode, languageCode), eq(chapterTranslations.status, "published"))).orderBy(asc(chapters.sortOrder));
+  const translatedCategories = await db.select({ name: sql<string>`COALESCE(${categoryTranslations.name}, ${categories.name})`, slug: categories.slug }).from(novelCategories).innerJoin(categories, eq(novelCategories.categoryId, categories.id)).leftJoin(categoryTranslations, and(eq(categoryTranslations.categoryId, categories.id), eq(categoryTranslations.languageCode, languageCode), eq(categoryTranslations.status, "published"))).where(eq(novelCategories.novelId, novel.id));
+  const translatedAuthor = await db.select({ displayName: authorTranslations.displayName, shortBio: authorTranslations.shortBio }).from(authorTranslations).where(and(eq(authorTranslations.authorId, novel.authorId), eq(authorTranslations.languageCode, languageCode), eq(authorTranslations.status, "published"))).limit(1);
+  return { ...novel, ...(novelTranslation ?? {}), authorName: translatedAuthor[0]?.displayName ?? novel.authorName, authorBio: translatedAuthor[0]?.shortBio ?? novel.authorBio, chapters: translatedChapters.length ? translatedChapters : chapterRows, categories: translatedCategories.length ? translatedCategories : categoryRows, tags: tagRows, related: relatedRows.filter(item => item.id !== novel.id) };
 }
 
-export async function getPublicChapter(novelSlug: string, chapterSlug: string, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+export async function getPublicChapter(novelSlug: string, chapterSlug: string, dbOverride?: NonNullable<Awaited<ReturnType<typeof getDb>>>, languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = dbOverride ?? await getDb();
   if (!db) return null;
   const rows = await db
@@ -160,31 +182,30 @@ export async function getPublicChapter(novelSlug: string, chapterSlug: string, d
     .limit(1);
   const chapter = rows[0];
   if (!chapter) return null;
-  const siblingRows = await db
-    .select({ title: chapters.title, slug: chapters.slug, sortOrder: chapters.sortOrder })
-    .from(chapters)
-    .where(and(eq(chapters.novelId, chapter.novelId), eq(chapters.status, "published")))
-    .orderBy(asc(chapters.sortOrder));
+  const siblingRows = await db.select({ title: chapters.title, slug: chapters.slug, sortOrder: chapters.sortOrder }).from(chapters).where(and(eq(chapters.novelId, chapter.novelId), eq(chapters.status, "published"))).orderBy(asc(chapters.sortOrder));
+  if (languageCode !== "ar") {
+    const [chapterTranslation] = await db.select({ title: chapterTranslations.title, content: chapterTranslations.content }).from(chapterTranslations).where(and(eq(chapterTranslations.chapterId, chapter.chapterId), eq(chapterTranslations.languageCode, languageCode), eq(chapterTranslations.status, "published"))).limit(1);
+    const translatedNovel = await db.select({ title: novelTranslations.title }).from(novelTranslations).where(and(eq(novelTranslations.novelId, chapter.novelId), eq(novelTranslations.languageCode, languageCode), eq(novelTranslations.status, "published"))).limit(1);
+    const translatedAuthor = await db.select({ displayName: authorTranslations.displayName }).from(authorTranslations).where(and(eq(authorTranslations.authorId, await db.select({ authorId: novels.authorId }).from(novels).where(eq(novels.id, chapter.novelId)).limit(1).then(rows => rows[0]?.authorId ?? 0)), eq(authorTranslations.languageCode, languageCode), eq(authorTranslations.status, "published"))).limit(1);
+    if (chapterTranslation) return { ...chapter, chapterTitle: chapterTranslation.title, content: chapterTranslation.content, novelTitle: translatedNovel[0]?.title ?? chapter.novelTitle, authorName: translatedAuthor[0]?.displayName ?? chapter.authorName, chapters: siblingRows, previous: null, next: null };
+  }
   const index = siblingRows.findIndex(item => item.slug === chapter.chapterSlug);
   return { ...chapter, chapters: siblingRows, previous: index > 0 ? siblingRows[index - 1] : null, next: index < siblingRows.length - 1 ? siblingRows[index + 1] : null };
 }
 
-export async function listPublicAuthors(input: { query?: string; limit?: number; offset?: number } = {}) {
+export async function listPublicAuthors(input: { query?: string; limit?: number; offset?: number; languageCode?: "ar" | "en" | "fr" | "tr" } = {}) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(authors.isVisible, true)];
   if (input.query?.trim()) conditions.push(like(authors.normalizedName, `%${normalizeArabic(input.query)}%`));
-  return db
-    .select({ id: authors.id, name: authors.displayName, slug: authors.slug, shortBio: authors.shortBio, imageUrl: media.url })
-    .from(authors)
-    .leftJoin(media, eq(authors.imageMediaId, media.id))
-    .where(and(...conditions))
-    .orderBy(asc(authors.displayName))
-    .limit(Math.min(Math.max(input.limit ?? 24, 1), 48))
-    .offset(Math.max(input.offset ?? 0, 0));
+  const rows = await db.select({ id: authors.id, name: authors.displayName, slug: authors.slug, shortBio: authors.shortBio, imageUrl: media.url }).from(authors).leftJoin(media, eq(authors.imageMediaId, media.id)).where(and(...conditions)).orderBy(asc(authors.displayName)).limit(Math.min(Math.max(input.limit ?? 24, 1), 48)).offset(Math.max(input.offset ?? 0, 0));
+  if (!input.languageCode || input.languageCode === "ar" || !rows.length) return rows;
+  const translations = await db.select({ authorId: authorTranslations.authorId, displayName: authorTranslations.displayName, shortBio: authorTranslations.shortBio }).from(authorTranslations).where(and(inArray(authorTranslations.authorId, rows.map(row => row.id)), eq(authorTranslations.languageCode, input.languageCode), eq(authorTranslations.status, "published")));
+  const byAuthor = new Map(translations.map(item => [item.authorId, item]));
+  return rows.map(row => ({ ...row, name: byAuthor.get(row.id)?.displayName ?? row.name, shortBio: byAuthor.get(row.id)?.shortBio ?? row.shortBio }));
 }
 
-export async function getPublicAuthor(slug: string) {
+export async function getPublicAuthor(slug: string, languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = await getDb();
   if (!db) return null;
   const authorRows = await db
@@ -195,6 +216,8 @@ export async function getPublicAuthor(slug: string) {
     .limit(1);
   const author = authorRows[0];
   if (!author) return null;
+  const authorTranslationRows = languageCode === "ar" ? [] : await db.select({ displayName: authorTranslations.displayName, shortBio: authorTranslations.shortBio, biography: authorTranslations.biography }).from(authorTranslations).where(and(eq(authorTranslations.authorId, author.id), eq(authorTranslations.languageCode, languageCode), eq(authorTranslations.status, "published"))).limit(1);
+  const authorTranslation = authorTranslationRows[0] ?? null;
   const works = await db
     .select(publicNovelFields)
     .from(novels)
@@ -202,24 +225,24 @@ export async function getPublicAuthor(slug: string) {
     .leftJoin(media, eq(novels.coverMediaId, media.id))
     .where(and(eq(novels.authorId, author.id), eq(novels.status, "published")))
     .orderBy(desc(novels.updatedAt));
-  return { ...author, works };
+  return { ...author, ...(authorTranslation ?? {}), works };
 }
 
-export async function listPublicCategories() {
+export async function listPublicCategories(languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = await getDb();
   if (!db) return [];
-  return db
-    .select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description })
-    .from(categories)
-    .where(eq(categories.isVisible, true))
-    .orderBy(asc(categories.name));
+  const rows = await db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description }).from(categories).where(eq(categories.isVisible, true)).orderBy(asc(categories.name));
+  if (languageCode === "ar" || !rows.length) return rows;
+  const translations = await db.select({ categoryId: categoryTranslations.categoryId, name: categoryTranslations.name, description: categoryTranslations.description }).from(categoryTranslations).where(and(inArray(categoryTranslations.categoryId, rows.map(row => row.id)), eq(categoryTranslations.languageCode, languageCode), eq(categoryTranslations.status, "published")));
+  const byCategory = new Map(translations.map(item => [item.categoryId, item]));
+  return rows.map(row => ({ ...row, name: byCategory.get(row.id)?.name ?? row.name, description: byCategory.get(row.id)?.description ?? row.description }));
 }
 
-export async function getHomeContent() {
+export async function getHomeContent(languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const [featured, latest, categories] = await Promise.all([
-    listPublicNovels({ limit: 6 }),
-    listPublicNovels({ limit: 12 }),
-    listPublicCategories(),
+    listPublicNovels({ limit: 6 }, undefined, languageCode),
+    listPublicNovels({ limit: 12 }, undefined, languageCode),
+    listPublicCategories(languageCode),
   ]);
   return { featured: featured.filter(novel => novel.isFeatured), latest, categories };
 }

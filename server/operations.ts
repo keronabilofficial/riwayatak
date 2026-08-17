@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
-import { desc, eq } from "drizzle-orm";
-import { authors, backupRuns, categories, chapters, media, novelCategories, novels, novelTags, scheduledJobs, tags } from "../drizzle/schema";
+import { count, desc, eq, gte } from "drizzle-orm";
+import { authors, backupRuns, categories, chapters, media, novelCategories, novels, novelTags, notifications, scheduledJobs, subscriptionCycles, tags } from "../drizzle/schema";
 import * as db from "./db";
 import { notifyOwner } from "./_core/notification";
 import { storagePut } from "./storage";
@@ -50,6 +50,16 @@ export async function sendDailyOperationsReport() {
 export async function getOperationsStatus() {
   const database = await db.getDb();
   if (!database) return { backups: [], schedules: [] };
-  const [backups, schedules] = await Promise.all([database.select().from(backupRuns).orderBy(desc(backupRuns.createdAt)).limit(8), database.select().from(scheduledJobs).orderBy(desc(scheduledJobs.updatedAt))]);
-  return { backups, schedules };
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [backups, schedules, editorial, failedBackups, failedSchedules, pendingPayments, recentMediaUploads, recentNotifications] = await Promise.all([
+    database.select().from(backupRuns).orderBy(desc(backupRuns.createdAt)).limit(8),
+    database.select().from(scheduledJobs).orderBy(desc(scheduledJobs.updatedAt)),
+    database.select({ review: count() }).from(chapters).where(eq(chapters.status, "review")),
+    database.select({ total: count() }).from(backupRuns).where(eq(backupRuns.status, "failed")),
+    database.select({ total: count() }).from(scheduledJobs).where(eq(scheduledJobs.lastResult, "failed")),
+    database.select({ total: count() }).from(subscriptionCycles).where(eq(subscriptionCycles.status, "pending")),
+    database.select({ total: count() }).from(media).where(gte(media.createdAt, since)),
+    database.select({ total: count() }).from(notifications).where(gte(notifications.createdAt, since)),
+  ]);
+  return { backups, schedules, editorial: { review: Number(editorial[0]?.review ?? 0), scheduled: Number(schedules.filter(job => job.jobKey === "scheduled-publications" && job.isEnabled).length) }, signals: { failedBackups: Number(failedBackups[0]?.total ?? 0), failedSchedules: Number(failedSchedules[0]?.total ?? 0), pendingPayments: Number(pendingPayments[0]?.total ?? 0), recentMediaUploads: Number(recentMediaUploads[0]?.total ?? 0), recentNotifications: Number(recentNotifications[0]?.total ?? 0) } };
 }
