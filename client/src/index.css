@@ -97,6 +97,9 @@
   button:active { transform: scale(.97); }
   .riwayatak-notification-enter { animation: riwayatak-notification-enter 260ms cubic-bezier(.23,1,.32,1) both; }
   .riwayatak-author-reply { animation: riwayatak-reply-enter 300ms cubic-bezier(.23,1,.32,1) both; }
+  .riwayatak-notification-item { transition: opacity 220ms cubic-bezier(.23,1,.32,1), transform 220ms cubic-bezier(.23,1,.32,1), background-color 220ms cubic-bezier(.23,1,.32,1); }
+  .riwayatak-notification-item.is-reading { opacity: .58; transform: translateX(-4px); }
+  .riwayatak-notification-item.is-deleting { opacity: 0; transform: translateX(-14px); pointer-events: none; }
 }
 
 /* ألوان متوافقة مع المكونات الحالية التي تستخدم درجات العلامة صراحةً. */
