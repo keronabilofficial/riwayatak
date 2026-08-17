@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, FileText, Image, LayoutDashboard, Link2, LogOut, Megaphone, Palette, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Image, LayoutDashboard, Link2, LogOut, Megaphone, Palette, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -248,9 +248,10 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
+        <div className="hidden h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:flex" dir="rtl"><span className="font-semibold text-foreground">{activeMenuItem?.label ?? "لوحة الإدارة"}</span><Button type="button" variant="outline" className="gap-2" onClick={() => setLocation("/")}><ExternalLink className="h-4 w-4" />العودة إلى المنصة</Button></div>
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
@@ -259,6 +260,7 @@ function DashboardLayoutContent({
                   </span>
                 </div>
               </div>
+              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setLocation("/")}><ExternalLink className="h-3.5 w-3.5" />المنصة</Button>
             </div>
           </div>
         )}

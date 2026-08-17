@@ -4,6 +4,7 @@ import { z } from "zod";
 import { activityLogs, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { appearanceSettingsSchema, getAppearanceSettings, getLegalDocuments, getManagedPlans, getSocialLinks, legalDocumentsSchema, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveLegalDocuments, saveManagedPlans, saveSocialLinks, socialLinksSchema } from "../lib/platformSettings";
+import { sanitizeLegalHtml } from "../../shared/legalHtml";
 import { publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
 async function logPlatformUpdate(userId: number, action: string) {
@@ -29,7 +30,8 @@ export const platformSettingsRouter = router({
   admin: router({
     get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), legalDocuments: await getLegalDocuments(), socialLinks: await getSocialLinks(), plans: await getManagedPlans() })),
     saveLegalDocuments: superAdminProcedure.input(z.object({ documents: legalDocumentsSchema })).mutation(async ({ ctx, input }) => {
-      await saveLegalDocuments(input.documents, ctx.user.id);
+      const sanitizedDocuments = Object.fromEntries(Object.entries(input.documents).map(([key, document]) => document ? [key, { ...document, sections: document.sections.map(section => ({ ...section, body: sanitizeLegalHtml(section.body) })) }] : [key, document]));
+      await saveLegalDocuments(sanitizedDocuments, ctx.user.id);
       await logPlatformUpdate(ctx.user.id, "platform.legal_documents.updated");
       return { success: true };
     }),
