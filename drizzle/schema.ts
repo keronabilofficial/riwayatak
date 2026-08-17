@@ -18,6 +18,7 @@ export const subscriptionBillingTerm = ["monthly", "quarterly", "hundred_days", 
 export const subscriptionStatus = ["pending", "active", "past_due", "cancelled", "expired"] as const;
 export const subscriptionCycleStatus = ["pending", "active", "expired", "failed"] as const;
 export const narrativeStatus = ["ongoing", "completed"] as const;
+export const supportedLanguageCode = ["ar", "en", "fr", "tr"] as const;
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -26,6 +27,9 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   avatarUrl: varchar("avatarUrl", { length: 1024 }),
   avatarKey: varchar("avatarKey", { length: 512 }),
+  bio: varchar("bio", { length: 500 }),
+  country: varchar("country", { length: 120 }),
+  preferredLanguage: mysqlEnum("preferredLanguage", supportedLanguageCode),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "editor", "admin", "super_admin"]).default("user").notNull(),
   isDisabled: boolean("isDisabled").default(false).notNull(),
@@ -606,7 +610,6 @@ export type Novel = typeof novels.$inferSelect;
 export type Chapter = typeof chapters.$inferSelect;
 
 
-export const supportedLanguageCode = ["ar", "en", "fr", "tr"] as const;
 export const translationStatus = ["draft", "review", "published"] as const;
 
 export const userLanguagePreferences = mysqlTable("user_language_preferences", {
@@ -692,6 +695,19 @@ export const chapterTranslationSuggestions = mysqlTable("chapter_translation_sug
 
 
 export const contactMessageStatus = ["new", "read", "replied", "archived"] as const;
+export const pointTransactionTypes = ["reading", "chapter_complete", "favorite", "review", "translation_suggestion", "profile_complete"] as const;
+
+export const userPointTransactions = mysqlTable("user_point_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: mysqlEnum("type", pointTransactionTypes).notNull(),
+  points: int("points").notNull(),
+  description: varchar("description", { length: 240 }).notNull(),
+  entityType: varchar("entityType", { length: 80 }),
+  entityId: int("entityId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("user_points_user_created_idx").on(table.userId, table.createdAt), index("user_points_user_type_idx").on(table.userId, table.type)]);
+
 
 export const contactMessages = mysqlTable("contact_messages", {
   id: int("id").autoincrement().primaryKey(),

@@ -176,6 +176,13 @@
       "when": 1786969836141,
       "tag": "0024_great_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1786970339690,
+      "tag": "0025_fair_morg",
+      "breakpoints": true
     }
   ]
 }
