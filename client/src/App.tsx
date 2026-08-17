@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import AuthorDetail from "./pages/AuthorDetail";
 import Authors from "./pages/Authors";
 import Categories from "./pages/Categories";
@@ -29,6 +30,7 @@ import AdminTaxonomy from "./pages/admin/AdminTaxonomy";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPlansSettings from "./pages/admin/AdminPlansSettings";
 import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
+import AdminTranslations from "./pages/admin/AdminTranslations";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -54,6 +56,7 @@ function Router() {
       <Route path={"/admin/system/plans"} component={AdminPlansSettings} />
       <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
       <Route path={"/admin/media"} component={AdminMedia} />
+      <Route path={"/admin/translations"} component={AdminTranslations} />
       <Route path={"/admin/system/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
@@ -80,10 +83,12 @@ function App() {
         defaultTheme="light"
         switchable
       >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

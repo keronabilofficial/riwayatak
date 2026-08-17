@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import AudioPlayerMock from "@/components/AudioPlayerMock";
 import ChapterComments from "@/components/ChapterComments";
 import { parseReaderFontScale, readerFontScaleKey } from "@/lib/readerPreferences";
@@ -13,7 +14,8 @@ import { Link, useLocation } from "wouter";
 type CachedReaderChapter = { novelId: number; chapterId: number; novelSlug: string; chapterSlug: string; novelTitle: string; chapterTitle: string; content: string; hasAudio: false; access: { allowed: true; reason?: string }; chapters: Array<{ slug: string; sortOrder: number; title: string }>; previous: null; next: null };
 
 export default function Reader({ novelSlug, chapterSlug }: { novelSlug: string; chapterSlug: string }) {
-  const { data: chapter, isLoading } = trpc.catalog.read.useQuery({ novelSlug, chapterSlug });
+  const { language } = useLanguage();
+  const { data: chapter, isLoading } = trpc.catalog.read.useQuery({ novelSlug, chapterSlug, languageCode: language });
   const [cachedChapter, setCachedChapter] = useState<CachedReaderChapter | null>(() => readCachedChapter<CachedReaderChapter>(offlineChapterKey(novelSlug, chapterSlug)));
   const [offlineSaved, setOfflineSaved] = useState(false);
   const readableChapter = chapter ?? cachedChapter;

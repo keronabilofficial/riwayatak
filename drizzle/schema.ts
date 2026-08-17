@@ -602,3 +602,71 @@ export type InsertUser = typeof users.$inferInsert;
 export type Author = typeof authors.$inferSelect;
 export type Novel = typeof novels.$inferSelect;
 export type Chapter = typeof chapters.$inferSelect;
+
+
+export const supportedLanguageCode = ["ar", "en", "fr", "tr"] as const;
+export const translationStatus = ["draft", "review", "published"] as const;
+
+export const userLanguagePreferences = mysqlTable("user_language_preferences", {
+  userId: int("userId").notNull().primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).default("ar").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const authorTranslations = mysqlTable("author_translations", {
+  id: int("id").autoincrement().primaryKey(),
+  authorId: int("authorId").notNull().references(() => authors.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).notNull(),
+  displayName: varchar("displayName", { length: 180 }).notNull(),
+  shortBio: text("shortBio"),
+  biography: longtext("biography"),
+  status: mysqlEnum("status", translationStatus).default("draft").notNull(),
+  translatedByUserId: int("translatedByUserId").references(() => users.id),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("author_translations_author_language_unique").on(table.authorId, table.languageCode), index("author_translations_language_status_idx").on(table.languageCode, table.status)]);
+
+export const categoryTranslations = mysqlTable("category_translations", {
+  id: int("id").autoincrement().primaryKey(),
+  categoryId: int("categoryId").notNull().references(() => categories.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", translationStatus).default("draft").notNull(),
+  translatedByUserId: int("translatedByUserId").references(() => users.id),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("category_translations_category_language_unique").on(table.categoryId, table.languageCode), index("category_translations_language_status_idx").on(table.languageCode, table.status)]);
+
+export const novelTranslations = mysqlTable("novel_translations", {
+  id: int("id").autoincrement().primaryKey(),
+  novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 255 }),
+  shortDescription: text("shortDescription"),
+  description: longtext("description"),
+  seoTitle: varchar("seoTitle", { length: 255 }),
+  seoDescription: varchar("seoDescription", { length: 360 }),
+  status: mysqlEnum("status", translationStatus).default("draft").notNull(),
+  translatedByUserId: int("translatedByUserId").references(() => users.id),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("novel_translations_novel_language_unique").on(table.novelId, table.languageCode), index("novel_translations_language_status_idx").on(table.languageCode, table.status)]);
+
+export const chapterTranslations = mysqlTable("chapter_translations", {
+  id: int("id").autoincrement().primaryKey(),
+  chapterId: int("chapterId").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  excerpt: text("excerpt"),
+  content: longtext("content").notNull(),
+  status: mysqlEnum("status", translationStatus).default("draft").notNull(),
+  translatedByUserId: int("translatedByUserId").references(() => users.id),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("chapter_translations_chapter_language_unique").on(table.chapterId, table.languageCode), index("chapter_translations_language_status_idx").on(table.languageCode, table.status)]);

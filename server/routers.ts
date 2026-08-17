@@ -10,6 +10,7 @@ import { audioRouter } from "./routers/audio";
 import { subscriptionsRouter } from "./routers/subscriptions";
 import { platformSettingsRouter } from "./routers/platformSettings";
 import { communityRouter } from "./routers/community";
+import { languageRouter } from "./routers/language";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -35,6 +36,7 @@ export const appRouter = router({
   subscriptions: subscriptionsRouter,
   platform: platformSettingsRouter,
   community: communityRouter,
+  language: languageRouter,
 });
 
 export type AppRouter = typeof appRouter;
