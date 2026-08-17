@@ -24,6 +24,8 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  avatarUrl: varchar("avatarUrl", { length: 1024 }),
+  avatarKey: varchar("avatarKey", { length: 512 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "editor", "admin", "super_admin"]).default("user").notNull(),
   isDisabled: boolean("isDisabled").default(false).notNull(),
