@@ -271,7 +271,12 @@ export const libraryRouter = router({
   }),
   notifications: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
-    return db.select({ id: notifications.id, userId: notifications.userId, novelId: notifications.novelId, authorId: notifications.authorId, type: notifications.type, title: notifications.title, body: notifications.body, href: notifications.href, isRead: notifications.isRead, createdAt: notifications.createdAt, novelTitle: novels.title, authorName: authors.displayName }).from(notifications).leftJoin(novels, eq(notifications.novelId, novels.id)).leftJoin(authors, eq(notifications.authorId, authors.id)).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(50);
+    const rows = await db.select({ id: notifications.id, userId: notifications.userId, novelId: notifications.novelId, authorId: notifications.authorId, type: notifications.type, title: notifications.title, body: notifications.body, href: notifications.href, isRead: notifications.isRead, createdAt: notifications.createdAt, novelTitle: novels.title, authorName: authors.displayName }).from(notifications).leftJoin(novels, eq(notifications.novelId, novels.id)).leftJoin(authors, eq(notifications.authorId, authors.id)).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt)).limit(50);
+    const novelIds = Array.from(new Set(rows.flatMap(row => row.novelId ? [row.novelId] : [])));
+    const categoryRows = novelIds.length ? await db.select({ novelId: novelCategories.novelId, categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, novelIds)) : [];
+    const categoryMap = new Map<number, number[]>();
+    for (const row of categoryRows) categoryMap.set(row.novelId, [...(categoryMap.get(row.novelId) ?? []), row.categoryId]);
+    return rows.map(row => ({ ...row, categoryIds: row.novelId ? categoryMap.get(row.novelId) ?? [] : [] }));
   }),
   notificationSettings: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();

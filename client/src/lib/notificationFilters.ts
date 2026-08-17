@@ -3,9 +3,10 @@ export type NotificationSort = "recent" | "oldest" | "novel" | "author";
 export type NotificationEntityFilter =
   | { kind: "all" }
   | { kind: "novel"; id: number }
-  | { kind: "author"; id: number };
+  | { kind: "author"; id: number }
+  | { kind: "category"; id: number };
 
-type NotificationRecord = { type: string; novelId?: number | null; authorId?: number | null };
+type NotificationRecord = { type: string; novelId?: number | null; authorId?: number | null; categoryIds?: readonly number[] };
 type SortableNotification = NotificationRecord & {
   createdAt?: Date | string | number | null;
   novelTitle?: string | null;
@@ -21,7 +22,8 @@ export function filterNotifications<T extends NotificationRecord>(
     const matchesType = typeFilter === "all" || notification.type === "new_chapter";
     const matchesEntity = entityFilter.kind === "all"
       || (entityFilter.kind === "novel" && notification.novelId === entityFilter.id)
-      || (entityFilter.kind === "author" && notification.authorId === entityFilter.id);
+      || (entityFilter.kind === "author" && notification.authorId === entityFilter.id)
+      || (entityFilter.kind === "category" && notification.categoryIds?.includes(entityFilter.id));
     return matchesType && matchesEntity;
   });
 }
