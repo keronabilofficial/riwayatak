@@ -7,7 +7,7 @@ import SectionHeading from "@/components/SectionHeading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, BookOpen, Feather, History, Search } from "lucide-react";
+import { ArrowLeft, BookOpen, Feather, History, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -17,6 +17,7 @@ export default function Home() {
   const canManageContent = canAccessManagement(user?.role);
   const { data: appearance } = trpc.platform.appearance.useQuery();
   const { data: continueReading } = trpc.library.continueReading.useQuery(undefined, { enabled: Boolean(user) });
+  const { data: suggestions } = trpc.library.suggestions.useQuery(undefined, { enabled: Boolean(user) });
   const [query, setQuery] = useState("");
   const [, navigate] = useLocation();
   const featured = data?.featured ?? [];
@@ -48,6 +49,8 @@ export default function Home() {
     </section>
 
     {user ? <section className="container pb-18 md:pb-24"><div className="rounded-[1.5rem] border border-[#1d2940]/10 bg-[#fbf8f2] p-6 md:p-8"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><History className="h-5 w-5 text-[#af7c42]" /><div><p className="text-xs font-bold text-[#af7c42]">عودة سريعة</p><h2 className="mt-1 font-serif text-3xl text-[#1d2940]">سجل القراءة</h2></div></div><Link href="/library" className="text-sm font-bold text-[#af7c42] hover:text-[#936536]">عرض مكتبتي</Link></div>{continueReading?.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{continueReading.slice(0, 3).map(item => <Link key={`${item.novelId}-${item.chapterId}`} href={`/read/${item.novelSlug}/${item.chapterSlug}`} className="group rounded-2xl border border-[#1d2940]/10 bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#af7c42]/50"><strong className="block truncate font-serif text-lg text-[#1d2940] group-hover:text-[#af7c42]">{item.novelTitle}</strong><span className="mt-1 block truncate text-xs text-[#667085]">{item.chapterTitle}</span><div className="mt-3 flex items-center justify-between text-xs text-[#667085]"><span>{item.progressPercent}% مكتمل</span><BookOpen className="h-4 w-4 text-[#af7c42]" /></div></Link>)}</div> : <p className="mt-5 rounded-xl bg-white p-4 text-sm text-[#667085]">سيظهر هنا آخر ما تصفحته بعد بدء قراءة رواية.</p>}</div></section> : null}
+
+    {user ? <section className="container pb-18 md:pb-24"><div className="rounded-[1.5rem] border border-[#af7c42]/25 bg-[#af7c42]/5 p-6 md:p-8"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><Sparkles className="h-5 w-5 text-[#af7c42]" /><div><p className="text-xs font-bold text-[#af7c42]">اختيارات مخصصة لك</p><h2 className="mt-1 font-serif text-3xl text-[#1d2940]">توصيات ذكية</h2></div></div><Link href="/library" className="text-sm font-bold text-[#af7c42] hover:text-[#936536]">إدارة تفضيلاتك</Link></div>{suggestions?.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{suggestions.slice(0, 6).map(item => <Link key={item.novelId} href={`/novels/${item.slug}`} className="group rounded-2xl border border-[#1d2940]/10 bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#af7c42]/50"><strong className="block truncate font-serif text-lg text-[#1d2940] group-hover:text-[#af7c42]">{item.title}</strong><span className="mt-1 block truncate text-xs text-[#667085]">{item.authorName}</span><p className="mt-2 line-clamp-2 text-xs leading-6 text-[#667085]">{item.shortDescription || "رواية تتقاطع مع ذائقتك القرائية."}</p><span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#af7c42]"><Sparkles className="h-3.5 w-3.5" />اقتراح مبني على اهتماماتك</span></Link>)}</div> : <p className="mt-5 rounded-xl bg-white p-4 text-sm text-[#667085]">ابدأ قراءة رواية أو قيّمها لتظهر توصيات تناسب ذائقتك.</p>}</div></section> : null}
 
     <section className="border-y border-[#1d2940]/10 bg-[#e9dfca]/45 py-18 md:py-24"><div className="container"><SectionHeading eyebrow="دليل القراءة" title="اختر مزاجك الأدبي" href="/categories" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{categories.length ? categories.slice(0, 8).map((category, index) => <Link key={category.id} href={`/categories/${category.slug}`} className="group flex min-h-32 items-end justify-between rounded-2xl border border-[#1d2940]/10 bg-[#f6f1e7] p-5 transition hover:-translate-y-1 hover:border-[#af7c42]/50 hover:shadow-xl hover:shadow-[#1d2940]/5"><span><span className="mb-2 block text-xs font-bold text-[#af7c42]">{String(index + 1).padStart(2, "0")}</span><strong className="font-serif text-2xl">{category.name}</strong><span className="mt-1 block text-xs text-[#667085]">{category.description || "اكتشف عوالم جديدة"}</span></span><ArrowLeft className="h-5 w-5 text-[#af7c42]" /></Link>) : <div className="col-span-full rounded-2xl bg-[#f6f1e7] p-7 text-sm text-[#667085]">يمكن إضافة التصنيفات وإدارتها من لوحة التحكم.</div>}</div>

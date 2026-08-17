@@ -156,22 +156,26 @@ export const libraryRouter = router({
     const db = await requireDb();
     const favoriteSeeds = await db.select({ novelId: favorites.novelId }).from(favorites).where(eq(favorites.userId, ctx.user.id));
     const readingSeeds = await db.select({ novelId: readingProgress.novelId }).from(readingProgress).where(eq(readingProgress.userId, ctx.user.id));
+    const ratingSeeds = await db.select({ novelId: favoriteRatings.novelId, rating: favoriteRatings.rating }).from(favoriteRatings).where(and(eq(favoriteRatings.userId, ctx.user.id), sql`${favoriteRatings.rating} >= 4`));
+    const highRatedSeedIds = new Set(ratingSeeds.map(row => row.novelId));
     const seedIds = Array.from(new Set([...favoriteSeeds, ...readingSeeds].map(row => row.novelId)));
     if (!seedIds.length) return [];
     const dismissedRows = await db.select({ novelId: recommendationDismissals.novelId }).from(recommendationDismissals).where(eq(recommendationDismissals.userId, ctx.user.id));
     const dismissedIds = dismissedRows.map(row => row.novelId);
-    const seedCategoryRows = await db.select({ categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, seedIds));
-    const seedTagRows = await db.select({ tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, seedIds));
+    const seedCategoryRows = await db.select({ novelId: novelCategories.novelId, categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, seedIds));
+    const seedTagRows = await db.select({ novelId: novelTags.novelId, tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, seedIds));
     const categoryIds = new Set(seedCategoryRows.map(row => row.categoryId));
     const tagIds = new Set(seedTagRows.map(row => row.tagId));
+    const highRatedCategoryIds = new Set(seedCategoryRows.filter(row => highRatedSeedIds.has(row.novelId)).map(row => row.categoryId));
+    const highRatedTagIds = new Set(seedTagRows.filter(row => highRatedSeedIds.has(row.novelId)).map(row => row.tagId));
     const candidates = await db.select({ novelId: novels.id, title: novels.title, slug: novels.slug, shortDescription: novels.shortDescription, authorName: authors.displayName }).from(novels).innerJoin(authors, eq(novels.authorId, authors.id)).where(not(inArray(novels.id, [...seedIds, ...dismissedIds]))).limit(100);
     if (!candidates.length) return [];
     const candidateIds = candidates.map(row => row.novelId);
     const candidateCategories = await db.select({ novelId: novelCategories.novelId, categoryId: novelCategories.categoryId }).from(novelCategories).where(inArray(novelCategories.novelId, candidateIds));
     const candidateTags = await db.select({ novelId: novelTags.novelId, tagId: novelTags.tagId }).from(novelTags).where(inArray(novelTags.novelId, candidateIds));
     const scores = new Map<number, number>();
-    candidateCategories.forEach(row => { if (categoryIds.has(row.categoryId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 2); });
-    candidateTags.forEach(row => { if (tagIds.has(row.tagId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + 1); });
+    candidateCategories.forEach(row => { if (categoryIds.has(row.categoryId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + (highRatedCategoryIds.has(row.categoryId) ? 4 : 2)); });
+    candidateTags.forEach(row => { if (tagIds.has(row.tagId)) scores.set(row.novelId, (scores.get(row.novelId) ?? 0) + (highRatedTagIds.has(row.tagId) ? 2 : 1)); });
     return candidates.map(row => ({ ...row, relevanceScore: scores.get(row.novelId) ?? 0 })).filter(row => row.relevanceScore > 0).sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 8);
   }),
   publishFavoriteNote: protectedProcedure.input(z.object({ novelId: z.number().int(), rating: z.number().int().min(1).max(5).optional() })).mutation(async ({ ctx, input }) => {
