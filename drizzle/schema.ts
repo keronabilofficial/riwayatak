@@ -687,3 +687,20 @@ export const chapterTranslationSuggestions = mysqlTable("chapter_translation_sug
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("chapter_translation_suggestions_chapter_language_idx").on(table.chapterId, table.languageCode), index("chapter_translation_suggestions_status_idx").on(table.status)]);
+
+
+export const contactMessageStatus = ["new", "read", "replied", "archived"] as const;
+
+export const contactMessages = mysqlTable("contact_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").references(() => users.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 160 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 220 }).notNull(),
+  message: text("message").notNull(),
+  status: mysqlEnum("status", contactMessageStatus).default("new").notNull(),
+  adminReply: text("adminReply"),
+  repliedByUserId: int("repliedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("contact_messages_status_idx").on(table.status), index("contact_messages_user_idx").on(table.userId)]);

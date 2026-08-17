@@ -11,6 +11,7 @@ import Categories from "./pages/Categories";
 import Home from "./pages/Home";
 import Legal from "./pages/Legal";
 import Library from "./pages/Library";
+import Profile from "./pages/Profile";
 import NovelDetail from "./pages/NovelDetail";
 import Novels from "./pages/Novels";
 import Reader from "./pages/Reader";
@@ -31,6 +32,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPlansSettings from "./pages/admin/AdminPlansSettings";
 import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
 import AdminTranslations from "./pages/admin/AdminTranslations";
+import AdminContactMessages from "./pages/admin/AdminContactMessages";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -57,9 +59,11 @@ function Router() {
       <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
       <Route path={"/admin/media"} component={AdminMedia} />
       <Route path={"/admin/translations"} component={AdminTranslations} />
+      <Route path={"/admin/contact"} component={AdminContactMessages} />
       <Route path={"/admin/system/ads"} component={AdminAds} />
       <Route path={"/legal/:document"}>{params => <Legal document={params.document} />}</Route>
       <Route path={"/library"} component={Library} />
+      <Route path={"/profile"} component={Profile} />
       <Route path={"/community"} component={CommunityHub} />
       <Route path={"/lists"} component={PublicReadingLists} />
       <Route path={"/lists/:id"}>{params => <PublicReadingListDetail id={params.id} />}</Route>
