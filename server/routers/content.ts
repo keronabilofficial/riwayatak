@@ -9,6 +9,7 @@ import {
   favorites,
   favoriteRatings,
   favoriteNotes,
+  favoriteQuotes,
   recommendationDismissals,
   favoriteLists,
   favoriteListItems,
@@ -113,6 +114,25 @@ export const libraryRouter = router({
   continueReading: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
     return db.select({ novelId: readingProgress.novelId, chapterId: readingProgress.chapterId, progressPercent: readingProgress.progressPercent, lastReadAt: readingProgress.lastReadAt, novelTitle: novels.title, novelSlug: novels.slug, chapterSlug: chapters.slug, chapterTitle: chapters.title, totalReadingSeconds: readingProgress.totalReadingSeconds }).from(readingProgress).innerJoin(novels, eq(readingProgress.novelId, novels.id)).innerJoin(chapters, eq(readingProgress.chapterId, chapters.id)).where(eq(readingProgress.userId, ctx.user.id)).orderBy(desc(readingProgress.lastReadAt)).limit(12);
+  }),
+  quotes: protectedProcedure.input(z.object({ chapterId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const chapterCondition = input?.chapterId ? eq(favoriteQuotes.chapterId, input.chapterId) : undefined;
+    return db.select({ id: favoriteQuotes.id, novelId: favoriteQuotes.novelId, chapterId: favoriteQuotes.chapterId, selectedText: favoriteQuotes.selectedText, startOffset: favoriteQuotes.startOffset, endOffset: favoriteQuotes.endOffset, createdAt: favoriteQuotes.createdAt, chapterTitle: chapters.title, novelTitle: novels.title }).from(favoriteQuotes).innerJoin(chapters, eq(favoriteQuotes.chapterId, chapters.id)).innerJoin(novels, eq(favoriteQuotes.novelId, novels.id)).where(chapterCondition ? and(eq(favoriteQuotes.userId, ctx.user.id), chapterCondition) : eq(favoriteQuotes.userId, ctx.user.id)).orderBy(desc(favoriteQuotes.createdAt)).limit(100);
+  }),
+  saveQuote: protectedProcedure.input(z.object({ novelId: z.number().int().positive(), chapterId: z.number().int().positive(), selectedText: z.string().trim().min(1, "حدد نصًا قبل حفظ الاقتباس.").max(2000), startOffset: z.number().int().min(0).optional(), endOffset: z.number().int().min(0).optional() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [chapter] = await db.select({ id: chapters.id, novelId: chapters.novelId }).from(chapters).where(and(eq(chapters.id, input.chapterId), eq(chapters.novelId, input.novelId))).limit(1);
+    if (!chapter) throw new TRPCError({ code: "BAD_REQUEST", message: "الفصل المحدد لا ينتمي إلى الرواية المطلوبة." });
+    const [created] = await db.insert(favoriteQuotes).values({ userId: ctx.user.id, ...input }).$returningId();
+    return { success: true, id: created.id };
+  }),
+  deleteQuote: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [quote] = await db.select({ id: favoriteQuotes.id }).from(favoriteQuotes).where(and(eq(favoriteQuotes.id, input.id), eq(favoriteQuotes.userId, ctx.user.id))).limit(1);
+    if (!quote) throw new TRPCError({ code: "NOT_FOUND", message: "الاقتباس غير موجود أو لا تملك صلاحية حذفه." });
+    await db.delete(favoriteQuotes).where(eq(favoriteQuotes.id, input.id));
+    return { success: true };
   }),
   favorites: protectedProcedure.input(z.object({ sort: z.enum(["recent", "alphabetical"]).default("recent"), categorySlug: z.string().max(120).optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await requireDb();

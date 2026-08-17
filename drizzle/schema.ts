@@ -247,6 +247,21 @@ export const favoriteNotes = mysqlTable(
   table => [uniqueIndex("favorite_notes_user_novel_unique").on(table.userId, table.novelId)]
 );
 
+export const favoriteQuotes = mysqlTable(
+  "favorite_quotes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    novelId: int("novelId").notNull().references(() => novels.id, { onDelete: "cascade" }),
+    chapterId: int("chapterId").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+    selectedText: varchar("selectedText", { length: 2000 }).notNull(),
+    startOffset: int("startOffset"),
+    endOffset: int("endOffset"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("favorite_quotes_user_novel_idx").on(table.userId, table.novelId), index("favorite_quotes_user_chapter_idx").on(table.userId, table.chapterId)]
+);
+
 export const recommendationDismissals = mysqlTable(
   "recommendation_dismissals",
   {

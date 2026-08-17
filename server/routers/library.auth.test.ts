@@ -28,4 +28,10 @@ describe("صلاحيات مكتبة العضو", () => {
     await expect(caller.unpublishFavoriteNote({ novelId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.dismissSuggestion({ novelId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
+
+  it("يرفض قراءة وحفظ وحذف الاقتباسات من غير المسجل", async () => {
+    await expect(caller.quotes()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.saveQuote({ novelId: 1, chapterId: 1, selectedText: "اقتباس" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.deleteQuote({ id: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 });
