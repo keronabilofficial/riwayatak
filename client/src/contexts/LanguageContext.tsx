@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import AutoTranslateText from "@/components/AutoTranslateText";
 
 export const languageOptions = [
   { code: "ar", label: "العربية", direction: "rtl" },
@@ -55,7 +56,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     } satisfies LanguageContextValue;
   }, [isAuthenticated, language, savePreference]);
 
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return <LanguageContext.Provider value={value}><AutoTranslateText />{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage() {

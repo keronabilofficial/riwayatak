@@ -11,6 +11,7 @@ export type LanguageCode = (typeof languageCodes)[number];
 export const languageCodeSchema = z.enum(languageCodes);
 const translationSchema = z.object({ title: z.string(), subtitle: z.string().nullable(), shortDescription: z.string().nullable(), description: z.string().nullable() });
 const chapterTranslationSchema = z.object({ title: z.string(), excerpt: z.string().nullable(), content: z.string() });
+const dynamicTranslationCache = new Map<string, string>();
 
 async function requireDb() {
   const db = await getDb();
@@ -41,6 +42,19 @@ export const languageRouter = router({
     const db = await requireDb();
     const [row] = await db.select({ languageCode: userLanguagePreferences.languageCode }).from(userLanguagePreferences).where(eq(userLanguagePreferences.userId, ctx.user.id)).limit(1);
     return { languageCode: row?.languageCode ?? "ar" as LanguageCode };
+  }),
+  autoTranslate: publicProcedure.input(z.object({ targetLanguage: languageCodeSchema.refine(code => code !== "ar", "العربية هي اللغة الأصلية."), texts: z.array(z.string().trim().min(1).max(500)).min(1).max(24) })).mutation(async ({ input }) => {
+    const uniqueTexts = Array.from(new Set(input.texts));
+    const missing = uniqueTexts.filter(text => !dynamicTranslationCache.has(`${input.targetLanguage}:${text}`));
+    if (missing.length) {
+      const response = await invokeLLM({ model: "gpt-5-mini", messages: [{ role: "system", content: "أنت مترجم واجهات دقيق. ترجم كل عنصر إلى اللغة المطلوبة مع الحفاظ على ترتيب العناصر، ولا تضف شرحًا." }, { role: "user", content: JSON.stringify({ targetLanguage: input.targetLanguage, texts: missing }) }], responseFormat: { type: "json_schema", json_schema: { name: "dynamic_translations", strict: true, schema: { type: "object", properties: { translations: { type: "array", items: { type: "object", properties: { source: { type: "string" }, translated: { type: "string" } }, required: ["source", "translated"], additionalProperties: false } } }, required: ["translations"], additionalProperties: false } } }, maxTokens: 6000 });
+      const content = response.choices[0]?.message.content;
+      if (typeof content !== "string") throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر ترجمة النصوص حاليًا." });
+      const parsed = z.object({ translations: z.array(z.object({ source: z.string(), translated: z.string() })) }).safeParse(JSON.parse(content));
+      if (!parsed.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "نتيجة الترجمة التلقائية غير صالحة." });
+      for (const item of parsed.data.translations) if (missing.includes(item.source) && item.translated.trim()) dynamicTranslationCache.set(`${input.targetLanguage}:${item.source}`, item.translated.trim());
+    }
+    return { translations: uniqueTexts.map(source => ({ source, translated: dynamicTranslationCache.get(`${input.targetLanguage}:${source}`) ?? source })) };
   }),
   setPreference: protectedProcedure.input(z.object({ languageCode: languageCodeSchema })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
