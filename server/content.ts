@@ -193,22 +193,19 @@ export async function getPublicChapter(novelSlug: string, chapterSlug: string, d
   return { ...chapter, chapters: siblingRows, previous: index > 0 ? siblingRows[index - 1] : null, next: index < siblingRows.length - 1 ? siblingRows[index + 1] : null };
 }
 
-export async function listPublicAuthors(input: { query?: string; limit?: number; offset?: number } = {}) {
+export async function listPublicAuthors(input: { query?: string; limit?: number; offset?: number; languageCode?: "ar" | "en" | "fr" | "tr" } = {}) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(authors.isVisible, true)];
   if (input.query?.trim()) conditions.push(like(authors.normalizedName, `%${normalizeArabic(input.query)}%`));
-  return db
-    .select({ id: authors.id, name: authors.displayName, slug: authors.slug, shortBio: authors.shortBio, imageUrl: media.url })
-    .from(authors)
-    .leftJoin(media, eq(authors.imageMediaId, media.id))
-    .where(and(...conditions))
-    .orderBy(asc(authors.displayName))
-    .limit(Math.min(Math.max(input.limit ?? 24, 1), 48))
-    .offset(Math.max(input.offset ?? 0, 0));
+  const rows = await db.select({ id: authors.id, name: authors.displayName, slug: authors.slug, shortBio: authors.shortBio, imageUrl: media.url }).from(authors).leftJoin(media, eq(authors.imageMediaId, media.id)).where(and(...conditions)).orderBy(asc(authors.displayName)).limit(Math.min(Math.max(input.limit ?? 24, 1), 48)).offset(Math.max(input.offset ?? 0, 0));
+  if (!input.languageCode || input.languageCode === "ar" || !rows.length) return rows;
+  const translations = await db.select({ authorId: authorTranslations.authorId, displayName: authorTranslations.displayName, shortBio: authorTranslations.shortBio }).from(authorTranslations).where(and(inArray(authorTranslations.authorId, rows.map(row => row.id)), eq(authorTranslations.languageCode, input.languageCode), eq(authorTranslations.status, "published")));
+  const byAuthor = new Map(translations.map(item => [item.authorId, item]));
+  return rows.map(row => ({ ...row, name: byAuthor.get(row.id)?.displayName ?? row.name, shortBio: byAuthor.get(row.id)?.shortBio ?? row.shortBio }));
 }
 
-export async function getPublicAuthor(slug: string) {
+export async function getPublicAuthor(slug: string, languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = await getDb();
   if (!db) return null;
   const authorRows = await db
@@ -219,6 +216,8 @@ export async function getPublicAuthor(slug: string) {
     .limit(1);
   const author = authorRows[0];
   if (!author) return null;
+  const authorTranslationRows = languageCode === "ar" ? [] : await db.select({ displayName: authorTranslations.displayName, shortBio: authorTranslations.shortBio, biography: authorTranslations.biography }).from(authorTranslations).where(and(eq(authorTranslations.authorId, author.id), eq(authorTranslations.languageCode, languageCode), eq(authorTranslations.status, "published"))).limit(1);
+  const authorTranslation = authorTranslationRows[0] ?? null;
   const works = await db
     .select(publicNovelFields)
     .from(novels)
@@ -226,24 +225,24 @@ export async function getPublicAuthor(slug: string) {
     .leftJoin(media, eq(novels.coverMediaId, media.id))
     .where(and(eq(novels.authorId, author.id), eq(novels.status, "published")))
     .orderBy(desc(novels.updatedAt));
-  return { ...author, works };
+  return { ...author, ...(authorTranslation ?? {}), works };
 }
 
-export async function listPublicCategories() {
+export async function listPublicCategories(languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const db = await getDb();
   if (!db) return [];
-  return db
-    .select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description })
-    .from(categories)
-    .where(eq(categories.isVisible, true))
-    .orderBy(asc(categories.name));
+  const rows = await db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description }).from(categories).where(eq(categories.isVisible, true)).orderBy(asc(categories.name));
+  if (languageCode === "ar" || !rows.length) return rows;
+  const translations = await db.select({ categoryId: categoryTranslations.categoryId, name: categoryTranslations.name, description: categoryTranslations.description }).from(categoryTranslations).where(and(inArray(categoryTranslations.categoryId, rows.map(row => row.id)), eq(categoryTranslations.languageCode, languageCode), eq(categoryTranslations.status, "published")));
+  const byCategory = new Map(translations.map(item => [item.categoryId, item]));
+  return rows.map(row => ({ ...row, name: byCategory.get(row.id)?.name ?? row.name, description: byCategory.get(row.id)?.description ?? row.description }));
 }
 
-export async function getHomeContent() {
+export async function getHomeContent(languageCode: "ar" | "en" | "fr" | "tr" = "ar") {
   const [featured, latest, categories] = await Promise.all([
-    listPublicNovels({ limit: 6 }),
-    listPublicNovels({ limit: 12 }),
-    listPublicCategories(),
+    listPublicNovels({ limit: 6 }, undefined, languageCode),
+    listPublicNovels({ limit: 12 }, undefined, languageCode),
+    listPublicCategories(languageCode),
   ]);
   return { featured: featured.filter(novel => novel.isFeatured), latest, categories };
 }

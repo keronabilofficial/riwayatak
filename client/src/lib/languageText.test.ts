@@ -8,4 +8,12 @@ describe("language interface text", () => {
     expect(textFor("fr").library).toBe("Ma bibliothèque");
     expect(textFor("tr").language).toBe("Dil");
   });
+
+  it("provides translated notification controls for every supported language", () => {
+    for (const language of ["ar", "en", "fr", "tr"] as const) {
+      expect(textFor(language).notifications).toBeTruthy();
+      expect(textFor(language).clearFilters).toBeTruthy();
+      expect(textFor(language).newChaptersOnly).toBeTruthy();
+    }
+  });
 });

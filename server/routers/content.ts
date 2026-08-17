@@ -80,12 +80,12 @@ async function notifyAuthorFollowers(authorId: number, title: string, body: stri
 }
 
 export const catalogRouter = router({
-  home: publicProcedure.query(() => getHomeContent()),
+  home: publicProcedure.input(z.object({ languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") }).optional()).query(({ input }) => getHomeContent(input?.languageCode ?? "ar")),
   listNovels: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional(), categorySlug: z.string().max(120).optional(), narrativeStatus: z.enum(["ongoing", "completed"]).optional(), audioOnly: z.boolean().optional(), length: z.enum(["short", "medium", "long"]).optional(), minRating: z.number().min(1).max(5).optional(), sort: z.enum(["latest", "title", "chapters", "rating"]).optional(), languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") })).query(({ input }) => listPublicNovels(input, undefined, input.languageCode)),
   detail: publicProcedure.input(z.object({ slug: z.string().min(1).max(280), languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") })).query(({ input }) => getPublicNovel(input.slug, input.languageCode)),
-  listAuthors: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional() })).query(({ input }) => listPublicAuthors(input)),
-  author: publicProcedure.input(z.object({ slug: z.string().min(1).max(220) })).query(({ input }) => getPublicAuthor(input.slug)),
-  categories: publicProcedure.query(() => listPublicCategories()),
+  listAuthors: publicProcedure.input(paginationInput.extend({ query: z.string().max(180).optional(), languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") })).query(({ input }) => listPublicAuthors(input)),
+  author: publicProcedure.input(z.object({ slug: z.string().min(1).max(220), languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") })).query(({ input }) => getPublicAuthor(input.slug, input.languageCode)),
+  categories: publicProcedure.input(z.object({ languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") }).optional()).query(({ input }) => listPublicCategories(input?.languageCode ?? "ar")),
   read: publicProcedure.input(z.object({ novelSlug: z.string().min(1), chapterSlug: z.string().min(1), languageCode: z.enum(["ar", "en", "fr", "tr"]).default("ar") })).query(async ({ ctx, input }) => {
     const chapter = await getPublicChapter(input.novelSlug, input.chapterSlug, undefined, input.languageCode);
     if (!chapter) return null;
