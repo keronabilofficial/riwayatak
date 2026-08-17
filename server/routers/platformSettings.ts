@@ -5,6 +5,8 @@ import { activityLogs, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { appearanceSettingsSchema, getAppearanceSettings, getLegalDocuments, getManagedPlans, getSocialLinks, legalDocumentsSchema, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveLegalDocuments, saveManagedPlans, saveSocialLinks, socialLinksSchema } from "../lib/platformSettings";
 import { sanitizeLegalHtml } from "../../shared/legalHtml";
+import { decodeLegalImage, getLegalImageKey } from "../lib/legalImages";
+import { storagePut } from "../storage";
 import { publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
 async function logPlatformUpdate(userId: number, action: string) {
@@ -29,6 +31,12 @@ export const platformSettingsRouter = router({
   plans: publicProcedure.query(() => getManagedPlans()),
   admin: router({
     get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), legalDocuments: await getLegalDocuments(), socialLinks: await getSocialLinks(), plans: await getManagedPlans() })),
+    uploadLegalImage: superAdminProcedure.input(z.object({ fileName: z.string().trim().min(1).max(160), contentType: z.enum(["image/png", "image/jpeg", "image/webp"]), dataUrl: z.string().max(7_500_000) })).mutation(async ({ ctx, input }) => {
+      const decoded = decodeLegalImage(input.dataUrl);
+      if (decoded.contentType !== input.contentType) throw new TRPCError({ code: "BAD_REQUEST", message: "نوع الملف لا يطابق محتوى الصورة." });
+      const uploaded = await storagePut(getLegalImageKey(ctx.user.id, `${input.fileName}.${decoded.extension}`), decoded.buffer, decoded.contentType);
+      return { success: true, url: uploaded.url, key: uploaded.key };
+    }),
     saveLegalDocuments: superAdminProcedure.input(z.object({ documents: legalDocumentsSchema })).mutation(async ({ ctx, input }) => {
       const sanitizedDocuments = Object.fromEntries(Object.entries(input.documents).map(([key, document]) => document ? [key, { ...document, sections: document.sections.map(section => ({ ...section, body: sanitizeLegalHtml(section.body) })) }] : [key, document]));
       await saveLegalDocuments(sanitizedDocuments, ctx.user.id);
