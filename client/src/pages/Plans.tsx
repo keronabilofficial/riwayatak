@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { getPlanPresentation } from "@/lib/planPresentation";
+import { getCheckoutErrorMessage } from "@/lib/checkoutErrors";
 import { startLogin } from "@/const";
-import { Check, Headphones, Loader2, LockKeyhole, Sparkles } from "lucide-react";
+import { AlertCircle, Check, Headphones, Loader2, LockKeyhole, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,6 +18,7 @@ const planOrder: PlanName[] = ["go", "plus", "ultra", "enterprise"];
 const planLabels: Record<PlanName, string> = { go: "Go", plus: "Plus", ultra: "Ultra", enterprise: "Enterprise" };
 const termLabels: Record<BillingTerm, string> = { monthly: "شهريًا", quarterly: "90 يومًا", hundred_days: "100 يوم", six_months: "6 أشهر", yearly: "سنة" };
 
+
 export default function Plans() {
   const { isAuthenticated, user } = useAuth();
   const { data: options = [], isLoading } = trpc.subscriptions.plans.useQuery();
@@ -26,12 +28,14 @@ export default function Plans() {
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState("");
   const [selected, setSelected] = useState<{ planName: PlanName; billingTerm: BillingTerm } | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
   const startCheckout = trpc.subscriptions.startCheckout.useMutation({
     onSuccess: ({ checkoutUrl }) => {
+      setCheckoutError("");
       toast.success("سيتم فتح صفحة الدفع الآمنة في نافذة جديدة.");
       window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     },
-    onError: error => toast.error(error.message),
+    onError: error => { const message = getCheckoutErrorMessage(error.message); setCheckoutError(message); toast.error(message); },
   });
   const refreshSubscription = trpc.useUtils().subscriptions.mine;
   const cancelAtPeriodEnd = trpc.subscriptions.cancelAtPeriodEnd.useMutation({ onSuccess: async () => { await refreshSubscription.invalidate(); toast.success("سيبقى اشتراكك نشطًا حتى نهاية دورته الحالية."); }, onError: error => toast.error(error.message) });
@@ -41,6 +45,7 @@ export default function Plans() {
   const beginCheckout = () => {
     if (!isAuthenticated) return startLogin();
     if (!selected) return toast.error("اختر مدة الباقة أولًا.");
+    setCheckoutError("");
     startCheckout.mutate({ ...selected, billingEmail: email, phoneNumber: phone });
   };
 
@@ -68,7 +73,7 @@ export default function Plans() {
       })}</div>}
       <section className="mx-auto mt-12 max-w-xl rounded-3xl border border-border bg-card p-6 md:p-8">
         <div className="flex items-center gap-3"><LockKeyhole className="h-5 w-5 text-primary" /><div><h2 className="font-serif text-2xl">{presentation.checkoutTitle}</h2><p className="mt-1 text-sm text-muted-foreground">{presentation.checkoutDescription}</p></div></div>
-        <div className="mt-6 grid gap-4"><div className="grid gap-2"><Label htmlFor="billing-email">البريد الإلكتروني</Label><Input id="billing-email" dir="ltr" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="name@example.com" /></div><div className="grid gap-2"><Label htmlFor="billing-phone">رقم الهاتف بصيغة دولية</Label><Input id="billing-phone" dir="ltr" type="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="+201000000000" /></div><Button disabled={startCheckout.isPending || !selected} onClick={beginCheckout}>{startCheckout.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />جارٍ فتح الدفع…</> : isAuthenticated ? "الانتقال إلى الدفع الآمن" : "سجّل الدخول للمتابعة"}</Button></div>
+        <div className="mt-6 grid gap-4"><div className="grid gap-2"><Label htmlFor="billing-email">البريد الإلكتروني</Label><Input id="billing-email" dir="ltr" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="name@example.com" /></div><div className="grid gap-2"><Label htmlFor="billing-phone">رقم الهاتف بصيغة دولية</Label><Input id="billing-phone" dir="ltr" type="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="+201000000000" /></div><Button disabled={startCheckout.isPending || !selected} aria-busy={startCheckout.isPending} onClick={beginCheckout}>{startCheckout.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />جارٍ تجهيز الدفع الآمن…</> : isAuthenticated ? "الانتقال إلى الدفع الآمن" : "سجّل الدخول للمتابعة"}</Button>{checkoutError ? <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-3 text-sm leading-6 text-destructive"><AlertCircle className="mt-1 h-4 w-4 shrink-0" /><p>{checkoutError}</p></div> : null}</div>
       </section>
     </section>
   </PublicLayout>;
