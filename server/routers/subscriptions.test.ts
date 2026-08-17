@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const createPaymobCheckout = vi.fn();
+  const storageGetSignedUrl = vi.fn();
   const getAudioListenerAccess = vi.fn();
   const expireDueSubscriptionCycles = vi.fn();
   const values = vi.fn();
@@ -16,11 +17,12 @@ const mocks = vi.hoisted(() => {
   const updateWhere = vi.fn();
   const set = vi.fn(() => ({ where: updateWhere }));
   const update = vi.fn(() => ({ set }));
-  return { createPaymobCheckout, getAudioListenerAccess, expireDueSubscriptionCycles, values, insert, limit, where, innerJoin, from, select, deleteWhere, remove, updateWhere, set, update, database: { select, insert, delete: remove, update } };
+  return { createPaymobCheckout, storageGetSignedUrl, getAudioListenerAccess, expireDueSubscriptionCycles, values, insert, limit, where, innerJoin, from, select, deleteWhere, remove, updateWhere, set, update, database: { select, insert, delete: remove, update } };
 });
 
 vi.mock("../db", () => ({ getDb: vi.fn(async () => mocks.database) }));
 vi.mock("../lib/paymob", async importOriginal => ({ ...(await importOriginal<typeof import("../lib/paymob")>()), createPaymobCheckout: mocks.createPaymobCheckout }));
+vi.mock("../storage", async importOriginal => ({ ...(await importOriginal<typeof import("../storage")>()), storageGetSignedUrl: mocks.storageGetSignedUrl }));
 vi.mock("../lib/subscriptionAccess", async importOriginal => ({ ...(await importOriginal<typeof import("../lib/subscriptionAccess")>()), getAudioListenerAccess: mocks.getAudioListenerAccess, expireDueSubscriptionCycles: mocks.expireDueSubscriptionCycles }));
 
 import { subscriptionsRouter } from "./subscriptions";
@@ -32,6 +34,7 @@ describe("subscriptions.startCheckout", () => {
     mocks.expireDueSubscriptionCycles.mockResolvedValue(0);
     mocks.values.mockResolvedValueOnce([{ insertId: 41 }]).mockResolvedValueOnce([{ insertId: 51 }]);
     mocks.createPaymobCheckout.mockResolvedValue({ checkoutUrl: "https://eg.checkout.paymob.com/?test=1" });
+    mocks.storageGetSignedUrl.mockResolvedValue("https://signed.example/trusted.mp3");
   });
 
   it("ينشئ اشتراكًا ودورة معلقة ثم يعيد رابط Paymob", async () => {
@@ -52,11 +55,12 @@ describe("subscriptions.startCheckout", () => {
   });
 
   it("لا يعيد رابط الصوت عند تجاوز الحد ويعيد الرابط الموثوق عند السماح", async () => {
-    mocks.limit.mockResolvedValue([{ novelId: 2, audioUrl: "/manus-storage/trusted.mp3" }]);
+    mocks.limit.mockResolvedValue([{ novelId: 2, audioKey: "audio/trusted.mp3" }]);
     mocks.getAudioListenerAccess.mockResolvedValueOnce({ allowed: false, reason: "تم تجاوز الحد الصوتي." });
     const caller = subscriptionsRouter.createCaller({ user: { id: 7, name: "قارئ عربي", role: "user" } } as never);
     await expect(caller.listenChapter({ chapterId: 8 })).rejects.toMatchObject({ code: "FORBIDDEN" });
     mocks.getAudioListenerAccess.mockResolvedValueOnce({ allowed: true, planName: "go" });
-    await expect(caller.listenChapter({ chapterId: 8 })).resolves.toEqual({ audioUrl: "/manus-storage/trusted.mp3" });
+    await expect(caller.listenChapter({ chapterId: 8 })).resolves.toEqual({ audioUrl: "https://signed.example/trusted.mp3", expiresInSeconds: 900 });
+    expect(mocks.storageGetSignedUrl).toHaveBeenCalledWith("audio/trusted.mp3");
   });
 });

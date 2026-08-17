@@ -12,6 +12,7 @@ import { adminProcedure, router } from "../_core/trpc";
 const jobDefinitions = {
   "advanced-backup": { cron: "0 0 2 * * *", path: "/api/scheduled/operations", description: "نسخة محتوى متقدمة يومية" },
   "daily-operations-report": { cron: "0 0 8 * * *", path: "/api/scheduled/operations", description: "تقرير تشغيل يومي" },
+  "scheduled-publications": { cron: "0 */5 * * * *", path: "/api/scheduled/operations", description: "نشر الفصول التي حان موعدها" },
 } as const;
 
 export const operationsRouter = router({
@@ -37,7 +38,7 @@ export const operationsRouter = router({
   }),
   runSnapshotNow: adminProcedure.mutation(() => runContentSnapshot()),
   runReportNow: adminProcedure.mutation(() => sendDailyOperationsReport()),
-  configureSchedule: adminProcedure.input(z.object({ jobKey: z.enum(["advanced-backup", "daily-operations-report"]), cron: z.string().min(11).max(80).optional() })).mutation(async ({ ctx, input }) => {
+  configureSchedule: adminProcedure.input(z.object({ jobKey: z.enum(["advanced-backup", "daily-operations-report", "scheduled-publications"]), cron: z.string().min(11).max(80).optional() })).mutation(async ({ ctx, input }) => {
     if (!ENV.isProduction) throw new Error("انشر المنصة أولًا قبل تفعيل المهام الدورية.");
     const database = await db.getDb();
     if (!database) throw new Error("قاعدة البيانات غير متاحة.");

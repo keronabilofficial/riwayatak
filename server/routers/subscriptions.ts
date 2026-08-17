@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { chapterAudio, chapters, subscriptionAudioAccess, subscriptionCycles, subscriptionNovelAccess, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { storageGetSignedUrl } from "../storage";
 import { createPaymobCheckout } from "../lib/paymob";
 import { expireDueSubscriptionCycles, getAudioListenerAccess } from "../lib/subscriptionAccess";
 import { getManagedPlan, getManagedPlans, managedPlanToSubscriptionOption } from "../lib/platformSettings";
@@ -89,12 +90,18 @@ export const subscriptionsRouter = router({
   }),
   listenChapter: protectedProcedure.input(z.object({ chapterId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const database = await requireDb();
-    const audioRows = await database.select({ novelId: chapters.novelId, audioUrl: chapterAudio.url }).from(chapterAudio).innerJoin(chapters, eq(chapterAudio.chapterId, chapters.id)).where(eq(chapterAudio.chapterId, input.chapterId)).limit(1);
+    const audioRows = await database.select({ novelId: chapters.novelId, audioKey: chapterAudio.storageKey }).from(chapterAudio).innerJoin(chapters, eq(chapterAudio.chapterId, chapters.id)).where(eq(chapterAudio.chapterId, input.chapterId)).limit(1);
     const audio = audioRows[0];
     if (!audio) throw new TRPCError({ code: "NOT_FOUND", message: "لا يتوفر تسجيل صوتي لهذا الفصل." });
     const access = await getAudioListenerAccess(ctx.user.id, { chapterId: input.chapterId, novelId: audio.novelId });
     if (!access.allowed) throw new TRPCError({ code: "FORBIDDEN", message: access.reason });
-    return { audioUrl: audio.audioUrl };
+    let audioUrl: string;
+    try {
+      audioUrl = await storageGetSignedUrl(audio.audioKey);
+    } catch {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تجهيز رابط الاستماع المؤقت. حاول مرة أخرى لاحقًا." });
+    }
+    return { audioUrl, expiresInSeconds: 900 };
   }),
   cancelAtPeriodEnd: protectedProcedure.mutation(async ({ ctx }) => {
     const database = await requireDb();

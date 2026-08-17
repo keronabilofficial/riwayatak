@@ -134,6 +134,13 @@
       "when": 1786951919933,
       "tag": "0018_thin_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1786956392486,
+      "tag": "0019_optimal_grim_reaper",
+      "breakpoints": true
     }
   ]
 }

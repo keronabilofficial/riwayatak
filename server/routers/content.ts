@@ -34,6 +34,7 @@ import { getUserAccessUpdateError } from "../lib/access";
 import { mapChapterOrder } from "../lib/chapters";
 import { reviewInputSchema } from "../lib/reviews";
 import { getReaderAccess } from "../lib/subscriptionAccess";
+import { parseScheduledAt } from "../lib/scheduling";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
@@ -363,7 +364,7 @@ export const adminRouter = router({
   }),
   listChapters: editorProcedure.input(z.object({ novelId: z.number().int() })).query(async ({ input }) => {
     const db = await requireDb();
-    return db.select({ id: chapters.id, title: chapters.title, slug: chapters.slug, sortOrder: chapters.sortOrder, content: chapters.content, excerpt: chapters.excerpt, status: chapters.status, updatedAt: chapters.updatedAt }).from(chapters).where(eq(chapters.novelId, input.novelId)).orderBy(asc(chapters.sortOrder));
+    return db.select({ id: chapters.id, title: chapters.title, slug: chapters.slug, sortOrder: chapters.sortOrder, content: chapters.content, excerpt: chapters.excerpt, status: chapters.status, scheduledAt: chapters.scheduledAt, updatedAt: chapters.updatedAt }).from(chapters).where(eq(chapters.novelId, input.novelId)).orderBy(asc(chapters.sortOrder));
   }),
   listCategories: editorProcedure.query(async () => {
     const db = await requireDb();
@@ -425,18 +426,24 @@ export const adminRouter = router({
     if (input.status === "published") { await notifyOwner({ title: "نُشرت رواية جديدة", content: `تم نشر رواية «${input.title.trim()}».` }); await notifyAuthorFollowers(input.authorId, `رواية جديدة من مؤلف تتابعه`, `نشر المؤلف رواية «${input.title.trim()}».`, `/novels/${values.slug}`); }
     return { id };
   }),
-  upsertChapter: editorProcedure.input(z.object({ id: z.number().int().optional(), novelId: z.number().int(), title: z.string().min(1).max(255), slug: z.string().max(280).optional(), sortOrder: z.number().int().min(1), content: z.string().min(1).max(200000), excerpt: z.string().max(1500).optional(), status: publicationStatus.default("draft") })).mutation(async ({ ctx, input }) => {
+  upsertChapter: editorProcedure.input(z.object({ id: z.number().int().optional(), novelId: z.number().int(), title: z.string().min(1).max(255), slug: z.string().max(280).optional(), sortOrder: z.number().int().min(1), content: z.string().min(1).max(200000), excerpt: z.string().max(1500).optional(), status: publicationStatus.default("draft"), scheduledAt: z.string().datetime().optional().nullable() })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const now = new Date();
-    const values = { novelId: input.novelId, title: input.title.trim(), slug: input.slug?.trim() || toSlug(input.title), sortOrder: input.sortOrder, content: input.content, excerpt: input.excerpt, status: input.status, updatedByUserId: ctx.user.id };
+    let scheduledAt: Date | null;
+    try {
+      scheduledAt = parseScheduledAt(input.scheduledAt, input.status, now);
+    } catch (error) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "موعد النشر غير صالح." });
+    }
+    const values = { novelId: input.novelId, title: input.title.trim(), slug: input.slug?.trim() || toSlug(input.title), sortOrder: input.sortOrder, content: input.content, excerpt: input.excerpt, status: input.status, scheduledAt, updatedByUserId: ctx.user.id };
     if (input.id) {
       const existing = await db.select({ status: chapters.status, publishedAt: chapters.publishedAt }).from(chapters).where(eq(chapters.id, input.id)).limit(1);
-      await db.update(chapters).set({ ...values, publishedAt: input.status === "published" && !existing[0]?.publishedAt ? now : existing[0]?.publishedAt ?? null }).where(eq(chapters.id, input.id));
+      await db.update(chapters).set({ ...values, scheduledAt: input.status === "published" ? null : scheduledAt, publishedAt: input.status === "published" && !existing[0]?.publishedAt ? now : input.status === "published" ? existing[0]?.publishedAt ?? now : null }).where(eq(chapters.id, input.id));
       await logActivity(ctx.user.id, "chapter.updated", "chapter", input.id, { novelId: input.novelId, status: input.status });
       if (input.status === "published" && existing[0]?.status !== "published") { await notifyOwner({ title: "نُشر فصل جديد", content: `تم نشر فصل «${input.title.trim()}».` }); await notifyChapterFollowers(input.novelId, input.id, input.title.trim()); const [novel] = await db.select({ authorId: novels.authorId, slug: novels.slug, title: novels.title }).from(novels).where(eq(novels.id, input.novelId)).limit(1); if (novel) await notifyAuthorFollowers(novel.authorId, `فصل جديد من مؤلف تتابعه`, `نشر فصل «${input.title.trim()}» لرواية «${novel.title}».`, `/read/${novel.slug}/${values.slug}`); }
       return { id: input.id };
     }
-    const result = await db.insert(chapters).values({ ...values, createdByUserId: ctx.user.id, publishedAt: input.status === "published" ? now : null });
+    const result = await db.insert(chapters).values({ ...values, createdByUserId: ctx.user.id, scheduledAt, publishedAt: input.status === "published" ? now : null });
     const id = Number(result[0].insertId);
     await db.update(novels).set({ chapterCount: sql`${novels.chapterCount} + 1`, updatedByUserId: ctx.user.id }).where(eq(novels.id, input.novelId));
     await logActivity(ctx.user.id, "chapter.created", "chapter", id, { novelId: input.novelId, status: input.status });

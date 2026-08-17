@@ -156,6 +156,7 @@ export const chapters = mysqlTable(
     excerpt: text("excerpt"),
     status: mysqlEnum("status", publicationStatus).default("draft").notNull(),
     publishedAt: timestamp("publishedAt"),
+    scheduledAt: timestamp("scheduledAt"),
     createdByUserId: int("createdByUserId").notNull().references(() => users.id),
     updatedByUserId: int("updatedByUserId").references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -165,6 +166,7 @@ export const chapters = mysqlTable(
     uniqueIndex("chapters_novel_slug_unique").on(table.novelId, table.slug),
     uniqueIndex("chapters_novel_order_unique").on(table.novelId, table.sortOrder),
     index("chapters_reading_idx").on(table.novelId, table.status, table.sortOrder),
+    index("chapters_scheduled_idx").on(table.status, table.scheduledAt),
   ]
 );
 
