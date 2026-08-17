@@ -1,6 +1,8 @@
 import { normalizeArabic } from "./arabic";
 import { invokeLLM } from "../_core/llm";
 
+export type ModerationPolicy = { enabled?: boolean; blockSexualContent?: boolean; blockProfanity?: boolean; blockHarassment?: boolean; reviewImages?: boolean; customBlockedTerms?: string[] };
+
 export type ModerationResult = {
   allowed: boolean;
   category: "clean" | "profanity" | "sexual" | "harassment";
@@ -26,12 +28,15 @@ const variants = (term: string) => {
   return [normalized, normalized.replace(/ا/g, "ا"), normalized.replace(/ه/g, "ة")].filter(Boolean);
 };
 
-export function moderateText(value: string): ModerationResult {
+export function moderateText(value: string, policy: ModerationPolicy = {}) : ModerationResult {
+  if (policy.enabled === false) return { allowed: true, category: "clean", matched: [] };
   const normalized = compact(value);
   const matched: string[] = [];
   let category: ModerationResult["category"] = "clean";
 
+  const configuredTerms = policy.customBlockedTerms ?? [];
   for (const [candidateCategory, terms] of Object.entries(blockedTerms) as Array<[Exclude<ModerationResult["category"], "clean">, readonly string[]]>) {
+    if ((candidateCategory === "sexual" && policy.blockSexualContent === false) || (candidateCategory === "profanity" && policy.blockProfanity === false) || (candidateCategory === "harassment" && policy.blockHarassment === false)) continue;
     for (const term of terms) {
       if (variants(term).some(variant => normalized.includes(variant))) {
         matched.push(term);
@@ -39,6 +44,7 @@ export function moderateText(value: string): ModerationResult {
       }
     }
   }
+  for (const term of configuredTerms) if (variants(term).some(variant => normalized.includes(variant))) matched.push(term);
 
   if (matched.length) {
     return {
@@ -52,8 +58,8 @@ export function moderateText(value: string): ModerationResult {
   return { allowed: true, category: "clean", matched: [] };
 }
 
-export function assertModeratedText(value: string, label = "المحتوى") {
-  const result = moderateText(value);
+export function assertModeratedText(value: string, label = "المحتوى", policy: ModerationPolicy = {}) {
+  const result = moderateText(value, policy);
   if (!result.allowed) {
     throw new Error(`لا يمكن حفظ ${label}. ${result.message}`);
   }
@@ -64,7 +70,8 @@ export function moderationTextForUpload(fileName: string, altText?: string) {
   return moderateText(`${fileName} ${altText ?? ""}`);
 }
 
-export async function moderateImageUrl(url: string) {
+export async function moderateImageUrl(url: string, policy: ModerationPolicy = {}) {
+  if (policy.enabled === false || policy.reviewImages === false) return { allowed: true, category: "clean", reason: "فحص الصور معطل من إعدادات الإدارة." };
   const result = await invokeLLM({
     model: "gemini-3-flash-preview",
     messages: [{

@@ -44,6 +44,17 @@ export type SocialLink = z.infer<typeof socialLinkSchema>;
 
 export const DEFAULT_SOCIAL_LINKS: SocialLink[] = [];
 
+export const moderationSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  blockSexualContent: z.boolean().default(true),
+  blockProfanity: z.boolean().default(true),
+  blockHarassment: z.boolean().default(true),
+  reviewImages: z.boolean().default(true),
+  customBlockedTerms: z.array(z.string().trim().min(2).max(80)).max(500).default([]),
+});
+export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
+export const DEFAULT_MODERATION_SETTINGS: ModerationSettings = { enabled: true, blockSexualContent: true, blockProfanity: true, blockHarassment: true, reviewImages: true, customBlockedTerms: [] };
+
 export const legalDocumentKeySchema = z.enum(["privacy", "terms", "content", "copyright", "contact"]);
 export const legalSectionSchema = z.object({ heading: z.string().trim().min(2).max(160), body: z.string().trim().min(10) });
 export const legalDocumentSchema = z.object({ title: z.string().trim().min(2).max(120), intro: z.string().trim().min(10), notice: z.string().trim().optional(), sections: z.array(legalSectionSchema).max(30) });
@@ -126,6 +137,14 @@ export async function saveLegalDocuments(value: LegalDocuments, userId: number, 
 
 export async function getSocialLinks(databaseOverride?: DatabaseExecutor) {
   return readSetting("platform_social_links", socialLinksSchema, DEFAULT_SOCIAL_LINKS, databaseOverride);
+}
+
+export async function getModerationSettings(databaseOverride?: DatabaseExecutor) {
+  return readSetting("platform_moderation", moderationSettingsSchema, DEFAULT_MODERATION_SETTINGS, databaseOverride);
+}
+
+export async function saveModerationSettings(value: ModerationSettings, userId: number, databaseOverride?: DatabaseExecutor) {
+  return writeSetting("platform_moderation", value, userId, databaseOverride);
 }
 
 export async function saveSocialLinks(value: SocialLink[], userId: number, databaseOverride?: DatabaseExecutor) {

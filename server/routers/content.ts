@@ -36,6 +36,7 @@ import { reviewInputSchema } from "../lib/reviews";
 import { getReaderAccess } from "../lib/subscriptionAccess";
 import { parseScheduledAt } from "../lib/scheduling";
 import { assertModeratedText } from "../lib/moderation";
+import { getModerationSettings } from "../lib/platformSettings";
 import { notifyOwner } from "../_core/notification";
 import { adminProcedure, editorProcedure, protectedProcedure, publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
@@ -320,8 +321,9 @@ export const reviewsRouter = router({
     return review ?? null;
   }),
   upsert: protectedProcedure.input(reviewInputSchema).mutation(async ({ ctx, input }) => {
-    assertModeratedText(input.body, "المراجعة");
     const db = await requireDb();
+    const moderation = await getModerationSettings(db);
+    assertModeratedText(input.body, "المراجعة", moderation);
     const [novel] = await db.select({ id: novels.id, status: novels.status }).from(novels).where(eq(novels.id, input.novelId)).limit(1);
     if (!novel || novel.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "لا يمكن تقييم رواية غير منشورة." });
     await db.insert(novelReviews).values({ novelId: input.novelId, userId: ctx.user.id, rating: input.rating, body: input.body }).onDuplicateKeyUpdate({ set: { rating: input.rating, body: input.body, updatedAt: new Date() } });
@@ -417,8 +419,9 @@ export const adminRouter = router({
     return { success: true };
   }),
   upsertNovel: editorProcedure.input(z.object({ id: z.number().int().optional(), authorId: z.number().int(), title: z.string().min(2).max(255), subtitle: z.string().max(255).optional(), slug: z.string().max(280).optional(), shortDescription: z.string().max(1500).optional(), description: z.string().max(50000).optional(), coverMediaId: z.number().int().optional().nullable(), status: publicationStatus.default("draft"), isFeatured: z.boolean().default(false), seoTitle: z.string().max(255).optional(), seoDescription: z.string().max(360).optional() })).mutation(async ({ ctx, input }) => {
-    for (const [label, value] of [["عنوان الرواية", input.title], ["العنوان الفرعي", input.subtitle], ["الوصف المختصر", input.shortDescription], ["الوصف", input.description]] as const) if (value) assertModeratedText(value, label);
     const db = await requireDb();
+    const moderation = await getModerationSettings(db);
+    for (const [label, value] of [["عنوان الرواية", input.title], ["العنوان الفرعي", input.subtitle], ["الوصف المختصر", input.shortDescription], ["الوصف", input.description]] as const) if (value) assertModeratedText(value, label, moderation);
     const now = new Date();
     const values = { authorId: input.authorId, title: input.title.trim(), subtitle: input.subtitle, slug: input.slug?.trim() || toSlug(input.title), shortDescription: input.shortDescription, description: input.description, normalizedTitle: normalizeArabic(input.title), coverMediaId: input.coverMediaId ?? null, status: input.status, isFeatured: input.isFeatured, seoTitle: input.seoTitle, seoDescription: input.seoDescription, updatedByUserId: ctx.user.id };
     if (input.id) {
@@ -435,10 +438,11 @@ export const adminRouter = router({
     return { id };
   }),
   upsertChapter: editorProcedure.input(z.object({ id: z.number().int().optional(), novelId: z.number().int(), title: z.string().min(1).max(255), slug: z.string().max(280).optional(), sortOrder: z.number().int().min(1), content: z.string().min(1).max(200000), excerpt: z.string().max(1500).optional(), status: publicationStatus.default("draft"), scheduledAt: z.string().datetime().optional().nullable() })).mutation(async ({ ctx, input }) => {
-    assertModeratedText(input.title, "عنوان الفصل");
-    assertModeratedText(input.content, "محتوى الفصل");
-    if (input.excerpt) assertModeratedText(input.excerpt, "ملخص الفصل");
     const db = await requireDb();
+    const moderation = await getModerationSettings(db);
+    assertModeratedText(input.title, "عنوان الفصل", moderation);
+    assertModeratedText(input.content, "محتوى الفصل", moderation);
+    if (input.excerpt) assertModeratedText(input.excerpt, "ملخص الفصل", moderation);
     const now = new Date();
     let scheduledAt: Date | null;
     try {

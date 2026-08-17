@@ -22,4 +22,10 @@ describe("content moderation", () => {
     expect(moderationTextForUpload("cover.png", "غلاف رواية أدبية").allowed).toBe(true);
     expect(moderationTextForUpload("صورة-إباحية.png").allowed).toBe(false);
   });
+
+  it("uses administrator terms and switches", () => {
+    expect(moderateText("عبارة خاصة", { customBlockedTerms: ["عبارة خاصة"] }).allowed).toBe(false);
+    expect(moderateText("هذا محتوى إباحي", { blockSexualContent: false }).allowed).toBe(true);
+    expect(moderateText("أي نص", { enabled: false, customBlockedTerms: ["أي نص"] }).allowed).toBe(true);
+  });
 });

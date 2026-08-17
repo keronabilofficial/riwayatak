@@ -32,6 +32,7 @@ import AdminTaxonomy from "./pages/admin/AdminTaxonomy";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPlansSettings from "./pages/admin/AdminPlansSettings";
 import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
+import AdminModerationSettings from "./pages/admin/AdminModerationSettings";
 import AdminSocialLinks from "./pages/admin/AdminSocialLinks";
 import AdminTranslations from "./pages/admin/AdminTranslations";
 import AdminContactMessages from "./pages/admin/AdminContactMessages";
@@ -61,6 +62,7 @@ function Router() {
       <Route path={"/admin/operations"} component={AdminOperations} />
       <Route path={"/admin/system/plans"} component={AdminPlansSettings} />
       <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
+      <Route path={"/admin/system/moderation"} component={AdminModerationSettings} />
       <Route path={"/admin/system/social"} component={AdminSocialLinks} />
       <Route path={"/admin/system/legal"} component={AdminLegalDocuments} />
       <Route path={"/admin/system/pages"} component={AdminPageContent} />

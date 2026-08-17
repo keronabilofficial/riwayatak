@@ -37,6 +37,7 @@ const menuItems: { icon: typeof LayoutDashboard; label: string; path: string; ro
   { icon: Workflow, label: "التشغيل", path: "/admin/operations", roles: ["admin", "super_admin"] },
   { icon: Settings2, label: "الباقات", path: "/admin/system/plans", roles: ["super_admin"] },
   { icon: Palette, label: "المظهر", path: "/admin/system/appearance", roles: ["super_admin"] },
+  { icon: ShieldCheck, label: "سياسة الاعتدال", path: "/admin/system/moderation", roles: ["super_admin"] },
   { icon: Link2, label: "روابط التواصل", path: "/admin/system/social", roles: ["super_admin"] },
   { icon: FileText, label: "الوثائق القانونية", path: "/admin/system/legal", roles: ["super_admin"] },
   { icon: Megaphone, label: "إعلانات Google", path: "/admin/system/ads", roles: ["super_admin"] },
