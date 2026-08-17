@@ -695,7 +695,8 @@ export const chapterTranslationSuggestions = mysqlTable("chapter_translation_sug
 
 
 export const contactMessageStatus = ["new", "read", "replied", "archived"] as const;
-export const pointTransactionTypes = ["reading", "chapter_complete", "favorite", "review", "translation_suggestion", "profile_complete"] as const;
+export const pointTransactionTypes = ["reading", "chapter_complete", "favorite", "review", "translation_suggestion", "profile_complete", "redemption"] as const;
+export const pointRewardKeys = ["reader_badge", "golden_bookmark", "early_access", "exclusive_audio"] as const;
 
 export const userPointTransactions = mysqlTable("user_point_transactions", {
   id: int("id").autoincrement().primaryKey(),
@@ -707,6 +708,14 @@ export const userPointTransactions = mysqlTable("user_point_transactions", {
   entityId: int("entityId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("user_points_user_created_idx").on(table.userId, table.createdAt), index("user_points_user_type_idx").on(table.userId, table.type)]);
+
+export const userPointRedemptions = mysqlTable("user_point_redemptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rewardKey: mysqlEnum("rewardKey", pointRewardKeys).notNull(),
+  pointsCost: int("pointsCost").notNull(),
+  redeemedAt: timestamp("redeemedAt").defaultNow().notNull(),
+}, table => [uniqueIndex("user_point_redemptions_user_reward_unique").on(table.userId, table.rewardKey), index("user_point_redemptions_user_idx").on(table.userId, table.redeemedAt)]);
 
 
 export const contactMessages = mysqlTable("contact_messages", {

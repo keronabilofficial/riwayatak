@@ -183,6 +183,13 @@
       "when": 1786970339690,
       "tag": "0025_fair_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1786970989318,
+      "tag": "0026_massive_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }
