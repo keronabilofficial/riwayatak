@@ -44,7 +44,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate("/search")} aria-label={text.search}><Search className="h-5 w-5" /></Button><label className="sr-only" htmlFor="site-language">{text.language}</label><select id="site-language" aria-label={text.language} value={language} onChange={event => setLanguage(event.target.value as LanguageCode)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs text-foreground">{languageOptions.map(option => <option key={option.code} value={option.code}>{option.flag} {option.label}</option>)}</select>
+            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate("/search")} aria-label={text.search}><Search className="h-5 w-5" /></Button><label className="sr-only" htmlFor="site-language">{text.language}</label><select id="site-language" aria-label={text.language} value={language} onChange={event => setLanguage(event.target.value as LanguageCode)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs text-foreground">{languageOptions.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select>
             <ThemeToggle />
             {isAuthenticated ? (
               <>
@@ -65,7 +65,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <nav className="grid gap-1" aria-label="التنقل المحمول">
               {[...links, { href: "/search", label: text.search }].map(link => <Link key={link.href} href={link.href} className="rounded-lg px-3 py-3 font-semibold hover:bg-accent" onClick={() => setMenuOpen(false)}>{link.href === "/novels" ? text.novels : link.href === "/authors" ? text.authors : link.href === "/categories" ? text.categories : link.href === "/plans" ? text.plans : text.search}</Link>)}
               {isAuthenticated ? <><button type="button" className="w-full rounded-lg px-3 py-3 text-right font-semibold hover:bg-accent" onClick={() => { navigate("/profile"); setMenuOpen(false); }}>{text.profile}</button><button type="button" className="w-full rounded-lg px-3 py-3 text-right font-semibold text-destructive hover:bg-accent" onClick={() => void handleLogout()}>تسجيل الخروج</button></> : null}
-              <label className="flex items-center justify-between rounded-lg px-3 py-3 font-semibold"><span>{text.language}</span><select aria-label={text.language} value={language} onChange={event => setLanguage(event.target.value as LanguageCode)} className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground">{languageOptions.map(option => <option key={option.code} value={option.code}>{option.flag} {option.label}</option>)}</select></label><div className="px-3 py-2"><ThemeToggle compact={false} /></div>
+              <label className="flex items-center justify-between rounded-lg px-3 py-3 font-semibold"><span>{text.language}</span><select aria-label={text.language} value={language} onChange={event => setLanguage(event.target.value as LanguageCode)} className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground">{languageOptions.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label><div className="px-3 py-2"><ThemeToggle compact={false} /></div>
             </nav>
           </div>
         )}

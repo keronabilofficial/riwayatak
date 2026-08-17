@@ -18,9 +18,9 @@ describe("language interface text", () => {
     }
   });
 
-  it("keeps flags and legal labels available for every language", () => {
+  it("keeps language names and legal labels available without country flags", () => {
     expect(languageOptions).toHaveLength(4);
-    expect(languageOptions.every(option => option.flag.length > 0)).toBe(true);
+    expect(languageOptions.every(option => !("flag" in option))).toBe(true);
     for (const language of ["ar", "en", "fr", "tr"] as const) {
       const text = textFor(language);
       expect(text.privacy).toBeTruthy();
