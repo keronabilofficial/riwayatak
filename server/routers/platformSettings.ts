@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { activityLogs, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { appearanceSettingsSchema, getAppearanceSettings, getManagedPlans, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveManagedPlans } from "../lib/platformSettings";
+import { appearanceSettingsSchema, getAppearanceSettings, getManagedPlans, getSocialLinks, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveManagedPlans, saveSocialLinks, socialLinksSchema } from "../lib/platformSettings";
 import { publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
 async function logPlatformUpdate(userId: number, action: string) {
@@ -23,9 +23,15 @@ async function assertPlanHasNoActiveSubscriptions(plan: z.infer<typeof planRefer
 
 export const platformSettingsRouter = router({
   appearance: publicProcedure.query(() => getAppearanceSettings()),
+  socialLinks: publicProcedure.query(async () => (await getSocialLinks()).filter(link => link.enabled).sort((a, b) => a.sortOrder - b.sortOrder)),
   plans: publicProcedure.query(() => getManagedPlans()),
   admin: router({
-    get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), plans: await getManagedPlans() })),
+    get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), socialLinks: await getSocialLinks(), plans: await getManagedPlans() })),
+    saveSocialLinks: superAdminProcedure.input(z.object({ links: socialLinksSchema })).mutation(async ({ ctx, input }) => {
+      await saveSocialLinks(input.links, ctx.user.id);
+      await logPlatformUpdate(ctx.user.id, "platform.social_links.updated");
+      return { success: true };
+    }),
     saveAppearance: superAdminProcedure.input(appearanceSettingsSchema).mutation(async ({ ctx, input }) => {
       await saveAppearanceSettings(input, ctx.user.id);
       await logPlatformUpdate(ctx.user.id, "platform.appearance.updated");

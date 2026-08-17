@@ -24,6 +24,26 @@ export const appearanceSettingsSchema = z.object({
   checkoutDescription: z.string().min(5).max(220).default("يُحوَّل الدفع إلى صفحة Paymob الآمنة."),
 });
 
+export const socialLinkSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_-]+$/, "معرّف الرابط غير صالح.").max(40),
+  label: z.string().trim().min(2).max(40),
+  url: z.string().trim().url("أدخل رابطًا صحيحًا.").refine(value => value.startsWith("https://"), "يجب أن يبدأ الرابط بـ HTTPS."),
+  enabled: z.boolean(),
+  sortOrder: z.number().int().min(0).max(999),
+});
+
+export const socialLinksSchema = z.array(socialLinkSchema).max(20).superRefine((links, ctx) => {
+  const ids = new Set<string>();
+  for (const link of links) {
+    if (ids.has(link.id)) ctx.addIssue({ code: "custom", message: "لا يمكن تكرار معرّف الرابط.", path: ["links"] });
+    ids.add(link.id);
+  }
+});
+
+export type SocialLink = z.infer<typeof socialLinkSchema>;
+
+export const DEFAULT_SOCIAL_LINKS: SocialLink[] = [];
+
 export const managedPlanSchema = z.object({
   planName: z.enum(["go", "plus", "ultra", "enterprise"]),
   billingTerm: z.enum(["monthly", "quarterly", "hundred_days", "six_months", "yearly"]),
@@ -86,6 +106,14 @@ export async function getAppearanceSettings(databaseOverride?: DatabaseExecutor)
 
 export async function saveAppearanceSettings(value: AppearanceSettings, userId: number, databaseOverride?: DatabaseExecutor) {
   return writeSetting("platform_appearance", value, userId, databaseOverride);
+}
+
+export async function getSocialLinks(databaseOverride?: DatabaseExecutor) {
+  return readSetting("platform_social_links", socialLinksSchema, DEFAULT_SOCIAL_LINKS, databaseOverride);
+}
+
+export async function saveSocialLinks(value: SocialLink[], userId: number, databaseOverride?: DatabaseExecutor) {
+  return writeSetting("platform_social_links", value, userId, databaseOverride);
 }
 
 export async function getManagedPlans(databaseOverride?: DatabaseExecutor) {

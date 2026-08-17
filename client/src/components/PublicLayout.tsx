@@ -20,6 +20,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const { isAuthenticated, logout } = useAuth();
   const handleLogout = async () => { await logout(); setMenuOpen(false); navigate("/"); };
   const { data: appearance } = trpc.platform.appearance.useQuery();
+  const { data: socialLinks } = trpc.platform.socialLinks.useQuery();
   const platformName = appearance?.platformName ?? "روايتك بالعربية";
   const tagline = appearance?.tagline ?? "بالعربية";
 
@@ -72,7 +73,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <div className="mb-4 font-serif text-3xl">{platformName}</div>
             <p className="max-w-md text-sm leading-7 text-[#f6f1e7]/70">مكتبة رقمية عربية تصنع مساحة هادئة تليق بالحكايات: اكتشف الروايات، تابع الفصول، واقرأ على مهل.</p>
           </div>
-          <div className="grid content-start gap-2 text-sm text-[#f6f1e7]/75"><Link href="/novels">استكشف الروايات</Link><Link href="/authors">تعرّف إلى المؤلفين</Link><Link href="/categories">التصنيفات</Link></div>
+          <div className="grid content-start gap-2 text-sm text-[#f6f1e7]/75"><Link href="/novels">استكشف الروايات</Link><Link href="/authors">تعرّف إلى المؤلفين</Link><Link href="/categories">التصنيفات</Link>{socialLinks?.length ? <div className="mt-4 border-t border-white/10 pt-4"><p className="mb-2 text-xs font-bold text-[#f6f1e7]/55">تواصل معنا</p><div className="flex flex-wrap gap-x-4 gap-y-2">{socialLinks.map(link => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[#e1b15a]">{link.label}</a>)}</div></div> : null}</div>
           <div className="grid content-start gap-2 text-sm text-[#f6f1e7]/75"><Link href="/legal/privacy">الخصوصية</Link><Link href="/legal/terms">شروط الاستخدام</Link><Link href="/legal/content">سياسة المحتوى</Link><Link href="/legal/copyright">حقوق النشر</Link><Link href="/legal/contact">تواصل معنا</Link></div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-[#f6f1e7]/50">© {new Date().getFullYear()} روايتك بالعربية</div>
