@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { authors, authorTranslations, categories, categoryTranslations, chapterTranslations, chapters, novelTranslations, novels, userLanguagePreferences } from "../../drizzle/schema";
+import { authors, authorTranslations, categories, categoryTranslations, chapterTranslationSuggestions, chapterTranslations, chapters, novelTranslations, novels, userLanguagePreferences } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { editorProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -104,5 +104,19 @@ export const languageRouter = router({
       await db.update(chapterTranslations).set({ status: "published", reviewedByUserId: ctx.user.id, updatedAt: new Date() }).where(and(eq(chapterTranslations.chapterId, input.chapterId), eq(chapterTranslations.languageCode, input.languageCode)));
       return { success: true };
     }),
+    pendingSuggestions: editorProcedure.query(async () => {
+      const db = await requireDb();
+      return db.select({ id: chapterTranslationSuggestions.id, chapterId: chapterTranslationSuggestions.chapterId, languageCode: chapterTranslationSuggestions.languageCode, sourceText: chapterTranslationSuggestions.sourceText, suggestedText: chapterTranslationSuggestions.suggestedText, note: chapterTranslationSuggestions.note, status: chapterTranslationSuggestions.status, createdAt: chapterTranslationSuggestions.createdAt, chapterTitle: chapters.title }).from(chapterTranslationSuggestions).innerJoin(chapters, eq(chapterTranslationSuggestions.chapterId, chapters.id)).where(eq(chapterTranslationSuggestions.status, "pending")).orderBy(chapterTranslationSuggestions.createdAt).limit(200);
+    }),
+    reviewSuggestion: editorProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["approved", "rejected"]) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      await db.update(chapterTranslationSuggestions).set({ status: input.status, reviewedByUserId: ctx.user.id, updatedAt: new Date() }).where(eq(chapterTranslationSuggestions.id, input.id));
+      return { success: true, status: input.status };
+    }),
+  }),
+  suggestChapterTranslation: protectedProcedure.input(z.object({ chapterId: z.number().int().positive(), languageCode: languageCodeSchema.refine(code => code !== "ar", "لا تحتاج العربية إلى اقتراح ترجمة."), sourceText: z.string().trim().min(1).max(4000), suggestedText: z.string().trim().min(1).max(4000), note: z.string().trim().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await db.insert(chapterTranslationSuggestions).values({ chapterId: input.chapterId, languageCode: input.languageCode, sourceText: input.sourceText, suggestedText: input.suggestedText, note: input.note || null, suggestedByUserId: ctx.user.id, status: "pending" });
+    return { success: true, status: "pending" as const };
   }),
 });

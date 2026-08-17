@@ -670,3 +670,20 @@ export const chapterTranslations = mysqlTable("chapter_translations", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [uniqueIndex("chapter_translations_chapter_language_unique").on(table.chapterId, table.languageCode), index("chapter_translations_language_status_idx").on(table.languageCode, table.status)]);
+
+
+export const translationSuggestionStatus = ["pending", "approved", "rejected"] as const;
+
+export const chapterTranslationSuggestions = mysqlTable("chapter_translation_suggestions", {
+  id: int("id").autoincrement().primaryKey(),
+  chapterId: int("chapterId").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+  languageCode: mysqlEnum("languageCode", supportedLanguageCode).notNull(),
+  sourceText: text("sourceText").notNull(),
+  suggestedText: text("suggestedText").notNull(),
+  note: varchar("note", { length: 500 }),
+  status: mysqlEnum("status", translationSuggestionStatus).default("pending").notNull(),
+  suggestedByUserId: int("suggestedByUserId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reviewedByUserId: int("reviewedByUserId").references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("chapter_translation_suggestions_chapter_language_idx").on(table.chapterId, table.languageCode), index("chapter_translation_suggestions_status_idx").on(table.status)]);

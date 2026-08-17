@@ -4,10 +4,10 @@ import { trpc } from "@/lib/trpc";
 import AutoTranslateText from "@/components/AutoTranslateText";
 
 export const languageOptions = [
-  { code: "ar", label: "العربية", direction: "rtl" },
-  { code: "en", label: "English", direction: "ltr" },
-  { code: "fr", label: "Français", direction: "ltr" },
-  { code: "tr", label: "Türkçe", direction: "ltr" },
+  { code: "ar", label: "العربية", flag: "🇪🇬", direction: "rtl" },
+  { code: "en", label: "English", flag: "🇬🇧", direction: "ltr" },
+  { code: "fr", label: "Français", flag: "🇫🇷", direction: "ltr" },
+  { code: "tr", label: "Türkçe", flag: "🇹🇷", direction: "ltr" },
 ] as const;
 export type LanguageCode = (typeof languageOptions)[number]["code"];
 
