@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { activityLogs, subscriptions } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { appearanceSettingsSchema, getAppearanceSettings, getManagedPlans, getSocialLinks, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveManagedPlans, saveSocialLinks, socialLinksSchema } from "../lib/platformSettings";
+import { appearanceSettingsSchema, getAppearanceSettings, getLegalDocuments, getManagedPlans, getSocialLinks, legalDocumentsSchema, managedPlanSchema, managedPlansSchema, saveAppearanceSettings, saveLegalDocuments, saveManagedPlans, saveSocialLinks, socialLinksSchema } from "../lib/platformSettings";
 import { publicProcedure, router, superAdminProcedure } from "../_core/trpc";
 
 async function logPlatformUpdate(userId: number, action: string) {
@@ -23,10 +23,16 @@ async function assertPlanHasNoActiveSubscriptions(plan: z.infer<typeof planRefer
 
 export const platformSettingsRouter = router({
   appearance: publicProcedure.query(() => getAppearanceSettings()),
+  legalDocuments: publicProcedure.query(() => getLegalDocuments()),
   socialLinks: publicProcedure.query(async () => (await getSocialLinks()).filter(link => link.enabled).sort((a, b) => a.sortOrder - b.sortOrder)),
   plans: publicProcedure.query(() => getManagedPlans()),
   admin: router({
-    get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), socialLinks: await getSocialLinks(), plans: await getManagedPlans() })),
+    get: superAdminProcedure.query(async () => ({ appearance: await getAppearanceSettings(), legalDocuments: await getLegalDocuments(), socialLinks: await getSocialLinks(), plans: await getManagedPlans() })),
+    saveLegalDocuments: superAdminProcedure.input(z.object({ documents: legalDocumentsSchema })).mutation(async ({ ctx, input }) => {
+      await saveLegalDocuments(input.documents, ctx.user.id);
+      await logPlatformUpdate(ctx.user.id, "platform.legal_documents.updated");
+      return { success: true };
+    }),
     saveSocialLinks: superAdminProcedure.input(z.object({ links: socialLinksSchema })).mutation(async ({ ctx, input }) => {
       await saveSocialLinks(input.links, ctx.user.id);
       await logPlatformUpdate(ctx.user.id, "platform.social_links.updated");

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, Image, LayoutDashboard, Link2, LogOut, Megaphone, Palette, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
+import { BookOpen, FileText, Image, LayoutDashboard, Link2, LogOut, Megaphone, Palette, PanelLeft, Settings2, ShieldCheck, Tags, Users, Workflow } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -38,6 +38,7 @@ const menuItems: { icon: typeof LayoutDashboard; label: string; path: string; ro
   { icon: Settings2, label: "الباقات", path: "/admin/system/plans", roles: ["super_admin"] },
   { icon: Palette, label: "المظهر", path: "/admin/system/appearance", roles: ["super_admin"] },
   { icon: Link2, label: "روابط التواصل", path: "/admin/system/social", roles: ["super_admin"] },
+  { icon: FileText, label: "الوثائق القانونية", path: "/admin/system/legal", roles: ["super_admin"] },
   { icon: Megaphone, label: "إعلانات Google", path: "/admin/system/ads", roles: ["super_admin"] },
   { icon: ShieldCheck, label: "المستخدمون والأدوار", path: "/admin/system/users", roles: ["super_admin"] },
 ];

@@ -35,6 +35,7 @@ import AdminAppearanceSettings from "./pages/admin/AdminAppearanceSettings";
 import AdminSocialLinks from "./pages/admin/AdminSocialLinks";
 import AdminTranslations from "./pages/admin/AdminTranslations";
 import AdminContactMessages from "./pages/admin/AdminContactMessages";
+import AdminLegalDocuments from "./pages/admin/AdminLegalDocuments";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -60,6 +61,7 @@ function Router() {
       <Route path={"/admin/system/plans"} component={AdminPlansSettings} />
       <Route path={"/admin/system/appearance"} component={AdminAppearanceSettings} />
       <Route path={"/admin/system/social"} component={AdminSocialLinks} />
+      <Route path={"/admin/system/legal"} component={AdminLegalDocuments} />
       <Route path={"/admin/media"} component={AdminMedia} />
       <Route path={"/admin/translations"} component={AdminTranslations} />
       <Route path={"/admin/contact"} component={AdminContactMessages} />

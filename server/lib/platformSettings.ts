@@ -44,6 +44,14 @@ export type SocialLink = z.infer<typeof socialLinkSchema>;
 
 export const DEFAULT_SOCIAL_LINKS: SocialLink[] = [];
 
+export const legalDocumentKeySchema = z.enum(["privacy", "terms", "content", "copyright", "contact"]);
+export const legalSectionSchema = z.object({ heading: z.string().trim().min(2).max(160), body: z.string().trim().min(10).max(5000) });
+export const legalDocumentSchema = z.object({ title: z.string().trim().min(2).max(120), intro: z.string().trim().min(10).max(2000), notice: z.string().trim().max(1200).optional(), sections: z.array(legalSectionSchema).max(30) });
+export const legalDocumentsSchema = z.object({ privacy: legalDocumentSchema.optional(), terms: legalDocumentSchema.optional(), content: legalDocumentSchema.optional(), copyright: legalDocumentSchema.optional(), contact: legalDocumentSchema.optional() });
+export type LegalDocument = z.infer<typeof legalDocumentSchema>;
+export type LegalDocuments = z.infer<typeof legalDocumentsSchema>;
+export const DEFAULT_LEGAL_DOCUMENTS: LegalDocuments = {};
+
 export const managedPlanSchema = z.object({
   planName: z.enum(["go", "plus", "ultra", "enterprise"]),
   billingTerm: z.enum(["monthly", "quarterly", "hundred_days", "six_months", "yearly"]),
@@ -106,6 +114,14 @@ export async function getAppearanceSettings(databaseOverride?: DatabaseExecutor)
 
 export async function saveAppearanceSettings(value: AppearanceSettings, userId: number, databaseOverride?: DatabaseExecutor) {
   return writeSetting("platform_appearance", value, userId, databaseOverride);
+}
+
+export async function getLegalDocuments(databaseOverride?: DatabaseExecutor) {
+  return readSetting("platform_legal_documents", legalDocumentsSchema, DEFAULT_LEGAL_DOCUMENTS, databaseOverride);
+}
+
+export async function saveLegalDocuments(value: LegalDocuments, userId: number, databaseOverride?: DatabaseExecutor) {
+  return writeSetting("platform_legal_documents", value, userId, databaseOverride);
 }
 
 export async function getSocialLinks(databaseOverride?: DatabaseExecutor) {
