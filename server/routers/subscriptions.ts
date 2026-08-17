@@ -48,7 +48,8 @@ export const subscriptionsRouter = router({
     ]);
     const novelsUsed = Number(novelUsage[0]?.total ?? 0);
     const audioChaptersUsed = Number(audioUsage[0]?.total ?? 0);
-    return { ...current, novelsUsed, audioChaptersUsed, novelsRemaining: Math.max(0, current.novelLimit - novelsUsed), audioChaptersRemaining: current.audioChapterLimit === null || current.audioChapterLimit === undefined ? null : Math.max(0, current.audioChapterLimit - audioChaptersUsed) };
+    const daysRemaining = current.endsAt ? Math.max(0, Math.ceil((new Date(current.endsAt).getTime() - Date.now()) / 86_400_000)) : null;
+    return { ...current, novelsUsed, audioChaptersUsed, novelsRemaining: Math.max(0, current.novelLimit - novelsUsed), audioChaptersRemaining: current.audioChapterLimit === null || current.audioChapterLimit === undefined ? null : Math.max(0, current.audioChapterLimit - audioChaptersUsed), daysRemaining };
   }),
   startCheckout: protectedProcedure.input(planInput.extend({ billingEmail: z.string().email(), phoneNumber: z.string().regex(/^\+[1-9]\d{7,14}$/, "أدخل رقم هاتف بصيغة دولية مثل +201..." ) })).mutation(async ({ ctx, input }) => {
     const managedPlan = await getManagedPlan(input.planName, input.billingTerm);
